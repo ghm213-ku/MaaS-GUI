@@ -1,0 +1,1404 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaaS - Measurements as a Service",
+    "description": "Distributed measurement service with Redis and backend workers",
+    "version": "2.0"
+  },
+  "paths": {
+    "/api/v1/measurements/count-rate": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Count Rate Measurement",
+        "description": "Start a new count-rate measurement request.\n\nReturns a unique measurement ID (status ID) to be used for status queries and stopping.\nThe job is enqueued for processing by the backend worker.\n\nAutomatically books the specified channels.",
+        "operationId": "start_count_rate_measurement_api_v1_measurements_count_rate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountRateMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/count-rate-live": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Count Rate Live Measurement",
+        "description": "Start a new live streaming count-rate measurement request.\n\nReturns a unique measurement ID (status ID) to be used for status queries and stopping.\nThe job is enqueued for processing by the backend worker.\n\nAutomatically books the specified channels. Data will be streamed via Redis pub/sub on\nchannel `measurement:data:<status_id>`.",
+        "operationId": "start_count_rate_live_measurement_api_v1_measurements_count_rate_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountRateLiveMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/save-raw-tags": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Save Raw Tags Measurement",
+        "description": "Start a new save-raw-tags measurement request.\n\nReturns a unique measurement ID (status ID) to be used for status queries and stopping.\nThe job is enqueued for processing by the backend worker.\n\nAutomatically books the channels specified in the channel_list.",
+        "operationId": "start_save_raw_tags_measurement_api_v1_measurements_save_raw_tags_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRawTagsMeasurmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/correlation": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Correlation Measurement",
+        "description": "Start a new correlation measurement request.\n\nReturns a unique measurement ID (status ID) to be used for status queries and stopping.\nThe job is enqueued for processing by the backend worker.\n\nAutomatically books the specified channels (channel1 and channel2).",
+        "operationId": "start_correlation_measurement_api_v1_measurements_correlation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrelationMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/coincidences": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Coincidences Measurement",
+        "description": "Start a new coincidences measurement request.\n\nReturns a unique measurement ID (status ID) to be used for status queries and stopping.\nThe job is enqueued for processing by the backend worker.\n\nAutomatically books the specified channels.",
+        "operationId": "start_coincidences_measurement_api_v1_measurements_coincidences_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoincidencesMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/{measurement_id}": {
+      "delete": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Stop Measurement",
+        "description": "Stop an active measurement request, delete its data file, and release channels.\n\nStops the running measurement, deletes any data file that has already been\nwritten for it, and releases its booked channels.\n\nArgs:\n    measurement_id: The unique status ID returned when starting the measurement\n\nReturns:\n    Measurement response with stopped status\n\nRaises:\n    404: If measurement not found\n    409: If measurement is not active/queued",
+        "operationId": "stop_measurement_api_v1_measurements__measurement_id__delete",
+        "parameters": [
+          {
+            "name": "measurement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Measurement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/{measurement_id}/status": {
+      "get": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Get Measurement Status",
+        "description": "Query the status of a measurement.\n\nArgs:\n    measurement_id: The unique status ID returned when starting the measurement\n\nReturns:\n    Current status and duration information\n\nRaises:\n    404: If measurement not found",
+        "operationId": "get_measurement_status_api_v1_measurements__measurement_id__status_get",
+        "parameters": [
+          {
+            "name": "measurement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Measurement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/": {
+      "get": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "List Measurements",
+        "description": "List system health and available endpoints.\n\nReturns:\n    Service information and available endpoints",
+        "operationId": "list_measurements_api_v1_measurements__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response List Measurements Api V1 Measurements  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "List All Channels",
+        "description": "Get all channels with their status (available or booked).\n\nEndpoint: GET /api/v1/channels/\n\nReturns:\n    List of all channels with current status and booking information.",
+        "operationId": "list_all_channels_api_v1_channels__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/available": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "List Available Channels",
+        "description": "Get list of available channels and channel statistics.\n\nEndpoint: GET /api/v1/channels/available\n\nReturns:\n    Statistics and list of currently available channel numbers.",
+        "operationId": "list_available_channels_api_v1_channels_available_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/book": {
+      "post": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "Book Channels",
+        "description": "Book (reserve) channels for a measurement or user.\n\nEndpoint: POST /api/v1/channels/book\n\nArgs:\n    request: Contains booked_by identifier and list of channel_numbers to book\n\nReturns:\n    Booking confirmation with booked channels and timestamp\n\nRaises:\n    400: If channel numbers are invalid\n    409: If any channels are already booked",
+        "operationId": "book_channels_api_v1_channels_book_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelBookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelBookResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/release/{user_name}": {
+      "post": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "Release Channels",
+        "description": "Release (free up) all channels booked by a measurement or user.\n\nEndpoint: POST /api/v1/channels/release/{user_name}\n\nArgs:\n    user_name: The identifier (user) whose channels to release\n\nReturns:\n    Release confirmation with released channels count\n\nNote:\n    Channels are automatically released when a measurement completes, stops, or fails.\n    This endpoint allows explicit manual release if needed.",
+        "operationId": "release_channels_api_v1_channels_release__user_name__post",
+        "parameters": [
+          {
+            "name": "user_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelReleaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/set-parameters/": {
+      "post": {
+        "tags": [
+          "parameters"
+        ],
+        "summary": "Start Set Parameters",
+        "description": "Start a set parameters request.\n\nReturns a unique status ID to be used for status queries.\nThe job is enqueued for processing by the backend worker.",
+        "operationId": "start_set_parameters_api_v1_set_parameters__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetParametersRequest"
+              },
+              "example": {
+                "measurement_type": "set_parameters",
+                "duration_seconds": 0,
+                "metadata": {
+                  "channels": [
+                    1,
+                    2
+                  ],
+                  "user_name": "abc-123-def",
+                  "input_delay": 1000,
+                  "trigger_voltage": 0.5
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint with service information.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChannelBookRequest": {
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "Who is booking the channels (user identifier)"
+          },
+          "channel_numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channel Numbers",
+            "description": "List of channel numbers to book (e.g., [1, 2, 3] or [101, 102])"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_name",
+          "channel_numbers"
+        ],
+        "title": "ChannelBookRequest",
+        "description": "Request to book channels.",
+        "example": {
+          "channel_numbers": [
+            1,
+            2,
+            3
+          ],
+          "user_name": "abc-123-def"
+        }
+      },
+      "ChannelBookResponse": {
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "booked_channels": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Booked Channels"
+          },
+          "booking_time": {
+            "type": "string",
+            "title": "Booking Time"
+          },
+          "total_booked": {
+            "type": "integer",
+            "title": "Total Booked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_name",
+          "booked_channels",
+          "booking_time",
+          "total_booked"
+        ],
+        "title": "ChannelBookResponse",
+        "description": "Response after booking channels."
+      },
+      "ChannelInfo": {
+        "properties": {
+          "channel_number": {
+            "type": "integer",
+            "title": "Channel Number",
+            "description": "Channel number (1-16, 101-116, or 201-216)"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Channel status: 'available' or 'booked'"
+          },
+          "user_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Name",
+            "description": "Who booked the channel (user identifier)"
+          },
+          "booking_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Time",
+            "description": "ISO timestamp of when booked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel_number",
+          "status"
+        ],
+        "title": "ChannelInfo",
+        "description": "Information about a single channel."
+      },
+      "ChannelListResponse": {
+        "properties": {
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelInfo"
+            },
+            "type": "array",
+            "title": "Channels"
+          },
+          "total_channels": {
+            "type": "integer",
+            "title": "Total Channels"
+          },
+          "available_channels": {
+            "type": "integer",
+            "title": "Available Channels"
+          },
+          "booked_channels": {
+            "type": "integer",
+            "title": "Booked Channels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channels",
+          "total_channels",
+          "available_channels",
+          "booked_channels"
+        ],
+        "title": "ChannelListResponse",
+        "description": "Response containing list of channels."
+      },
+      "ChannelReleaseResponse": {
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "released_channels": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Released Channels"
+          },
+          "total_released": {
+            "type": "integer",
+            "title": "Total Released"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_name",
+          "released_channels",
+          "total_released"
+        ],
+        "title": "ChannelReleaseResponse",
+        "description": "Response after releasing channels."
+      },
+      "ChannelStatsResponse": {
+        "properties": {
+          "total_channels": {
+            "type": "integer",
+            "title": "Total Channels"
+          },
+          "available_channels": {
+            "type": "integer",
+            "title": "Available Channels"
+          },
+          "booked_channels": {
+            "type": "integer",
+            "title": "Booked Channels"
+          },
+          "utilization_percent": {
+            "type": "number",
+            "title": "Utilization Percent"
+          },
+          "available_channel_numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Available Channel Numbers",
+            "description": "List of available channel numbers"
+          },
+          "user_names": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "User Names",
+            "description": "Mapping of user_name identifier to channel lists"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_channels",
+          "available_channels",
+          "booked_channels",
+          "utilization_percent",
+          "available_channel_numbers",
+          "user_names"
+        ],
+        "title": "ChannelStatsResponse",
+        "description": "Response with channel statistics."
+      },
+      "CoincidencesMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "coincidences"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds",
+            "description": "Duration in seconds for the coincidences measurement"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CoincidencesMetadata",
+            "description": "Metadata containing channels, binwidth, n_values, and target_location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "metadata"
+        ],
+        "title": "CoincidencesMeasurementRequest",
+        "description": "Request model for coincidences measurements.",
+        "example": {
+          "duration_seconds": 60,
+          "measurement_type": "coincidences",
+          "metadata": {
+            "binwidth": 1000000000,
+            "channels": [
+              1,
+              2,
+              3
+            ],
+            "n_values": 1,
+            "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
+            "user_name": "abc-123-def"
+          }
+        }
+      },
+      "CoincidencesMetadata": {
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channels",
+            "description": "List of channel numbers to measure. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "binwidth": {
+            "type": "integer",
+            "title": "Binwidth",
+            "description": "Bin width in picoseconds for histogram. Default: 1e9 (1 second)",
+            "default": 1000000000
+          },
+          "n_values": {
+            "type": "integer",
+            "title": "N Values",
+            "description": "Number of bins in the histogram. Default: 1",
+            "default": 1
+          },
+          "target_location": {
+            "type": "string",
+            "title": "Target Location",
+            "description": "Target file path for saving results. Supports {datetime} and {measurement-type} placeholders",
+            "default": "desktop/MaasData/{datetime}/{measurement-type}"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channels",
+          "user_name"
+        ],
+        "title": "CoincidencesMetadata",
+        "description": "Metadata model for coincidences measurements with required and optional fields.",
+        "example": {
+          "binwidth": 1000000000,
+          "channels": [
+            1,
+            2,
+            3
+          ],
+          "n_values": 1,
+          "target_location": "desktop/MaasData/{datetime}/{measurement-type}"
+        }
+      },
+      "CorrelationMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "correlation"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds",
+            "description": "Duration in seconds for the correlation measurement"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CorrelationMetadata",
+            "description": "Metadata containing channel1, channel2, binwidth, n_values, and target_location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "metadata"
+        ],
+        "title": "CorrelationMeasurementRequest",
+        "description": "Request model for correlation measurements.",
+        "example": {
+          "duration_seconds": 60,
+          "measurement_type": "correlation",
+          "metadata": {
+            "binwidth": 1000000000,
+            "channel1": 1,
+            "channel2": 2,
+            "n_values": 100,
+            "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
+            "user_name": "abc-123-def"
+          }
+        }
+      },
+      "CorrelationMetadata": {
+        "properties": {
+          "channel1": {
+            "type": "integer",
+            "title": "Channel1",
+            "description": "First channel number to correlate. Required."
+          },
+          "channel2": {
+            "type": "integer",
+            "title": "Channel2",
+            "description": "Second channel number to correlate. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "binwidth": {
+            "type": "integer",
+            "title": "Binwidth",
+            "description": "Bin width in picoseconds for histogram. Default: 1e3 (1 millisecond)",
+            "default": 1000
+          },
+          "n_values": {
+            "type": "integer",
+            "title": "N Values",
+            "description": "Number of bins in the histogram. Default: 1000",
+            "default": 1000
+          },
+          "target_location": {
+            "type": "string",
+            "title": "Target Location",
+            "description": "Target file path for saving results. Supports {datetime} and {measurement-type} placeholders",
+            "default": "desktop/MaasData/{datetime}/{measurement-type}"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel1",
+          "channel2",
+          "user_name"
+        ],
+        "title": "CorrelationMetadata",
+        "description": "Metadata model for correlation measurements with required and optional fields.",
+        "example": {
+          "binwidth": 1000000000,
+          "channel1": 1,
+          "channel2": 2,
+          "n_values": 100,
+          "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
+          "user_name": "abc-123-def"
+        }
+      },
+      "CountRateLiveMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "count_rate_live"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds",
+            "description": "Duration in seconds for the count-rate measurement"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CountRateMetadata",
+            "description": "Metadata containing channels, binwidth, and n_values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "metadata"
+        ],
+        "title": "CountRateLiveMeasurementRequest",
+        "description": "Request model for live count-rate measurements.",
+        "example": {
+          "duration_seconds": 60,
+          "measurement_type": "count_rate_live",
+          "metadata": {
+            "binwidth": 1000000000,
+            "channels": [
+              1,
+              2,
+              3
+            ],
+            "n_values": 1,
+            "user_name": "abc-123-def"
+          }
+        }
+      },
+      "CountRateMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "count_rate"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds",
+            "description": "Duration in seconds for the count-rate measurement"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CountRateMetadata",
+            "description": "Metadata containing channels, binwidth, n_values, and target_location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "metadata"
+        ],
+        "title": "CountRateMeasurementRequest",
+        "description": "Request model for count-rate measurements.",
+        "example": {
+          "duration_seconds": 60,
+          "measurement_type": "count_rate",
+          "metadata": {
+            "binwidth": 1000000000,
+            "channels": [
+              1,
+              2,
+              3
+            ],
+            "n_values": 1,
+            "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
+            "user_name": "abc-123-def"
+          }
+        }
+      },
+      "CountRateMetadata": {
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channels",
+            "description": "List of channel numbers to measure. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "binwidth": {
+            "type": "integer",
+            "title": "Binwidth",
+            "description": "Bin width in picoseconds for histogram. Default: 1e9 (1 second)",
+            "default": 1000000000
+          },
+          "n_values": {
+            "type": "integer",
+            "title": "N Values",
+            "description": "Number of bins in the histogram. Default: 1",
+            "default": 1
+          },
+          "target_location": {
+            "type": "string",
+            "title": "Target Location",
+            "description": "Target file path for saving results. Supports {datetime} and {measurement-type} placeholders",
+            "default": "desktop/MaasData/{datetime}/{measurement-type}"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channels",
+          "user_name"
+        ],
+        "title": "CountRateMetadata",
+        "description": "Metadata model for count-rate measurements with required and optional fields.",
+        "example": {
+          "binwidth": 1000000000,
+          "channels": [
+            1,
+            2,
+            3
+          ],
+          "n_values": 1,
+          "target_location": "desktop/MaasData/{datetime}/{measurement-type}"
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MeasurementResponse": {
+        "properties": {
+          "measurement_id": {
+            "type": "string",
+            "title": "Measurement Id",
+            "description": "Unique identifier for this measurement"
+          },
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current status: 'active', 'completed', 'stopped'"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At",
+            "description": "When the measurement started"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "measurement_id",
+          "measurement_type",
+          "status",
+          "started_at",
+          "message"
+        ],
+        "title": "MeasurementResponse",
+        "description": "Response model for measurement operations."
+      },
+      "MeasurementStatusResponse": {
+        "properties": {
+          "measurement_id": {
+            "type": "string",
+            "title": "Measurement Id"
+          },
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "duration_so_far": {
+            "type": "number",
+            "title": "Duration So Far",
+            "description": "Duration in seconds since start"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results",
+            "description": "Preliminary results (if available)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "measurement_id",
+          "measurement_type",
+          "status",
+          "started_at",
+          "duration_so_far",
+          "metadata"
+        ],
+        "title": "MeasurementStatusResponse",
+        "description": "Response model for measurement status queries."
+      },
+      "MeasurementType": {
+        "type": "string",
+        "enum": [
+          "count_rate",
+          "count_rate_live",
+          "save_raw_tags",
+          "correlation",
+          "coincidences",
+          "set_parameters"
+        ],
+        "title": "MeasurementType",
+        "description": "Supported measurement types. Extensible for future types."
+      },
+      "SaveRawTagsMeasurmentRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "save_raw_tags"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds",
+            "description": "Duration in seconds to save raw tags"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/SaveRawTagsMetadata",
+            "description": "Metadata containing required channel_list and target_file_path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "metadata"
+        ],
+        "title": "SaveRawTagsMeasurmentRequest",
+        "description": "Request model for saving raw tags measurements.",
+        "example": {
+          "duration_seconds": 60,
+          "measurement_type": "save_raw_tags",
+          "metadata": {
+            "channel_list": [
+              1,
+              2,
+              3
+            ],
+            "target_file_path": "C:\\Users\\s257050\\Desktop\\fileWriter",
+            "user_name": "abc-123-def"
+          }
+        }
+      },
+      "SaveRawTagsMetadata": {
+        "properties": {
+          "channel_list": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channel List",
+            "description": "List of channels to save raw tags from. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "target_file_path": {
+            "type": "string",
+            "title": "Target File Path",
+            "description": "File path to save the raw tags data. Required."
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel_list",
+          "user_name",
+          "target_file_path"
+        ],
+        "title": "SaveRawTagsMetadata",
+        "description": "Metadata model for save-raw-tags measurements with required fields.",
+        "example": {
+          "channel_list": [
+            1,
+            2,
+            3
+          ],
+          "target_file_path": "C:\\Users\\s257050\\Desktop\\fileWriter",
+          "user_name": "abc-123-def"
+        }
+      },
+      "SetParametersMetadata": {
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Channels",
+            "description": "List of channel numbers to configure. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "input_delay": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Delay",
+            "description": "Input delay in picoseconds"
+          },
+          "trigger_voltage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Voltage",
+            "description": "Trigger voltage in volts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channels",
+          "user_name"
+        ],
+        "title": "SetParametersMetadata",
+        "description": "Metadata model for setting parameters with required and optional fields.",
+        "example": {
+          "channels": [
+            1,
+            2
+          ],
+          "input_delay": 1000,
+          "trigger_voltage": 0.5,
+          "user_name": "abc-123-def"
+        }
+      },
+      "SetParametersRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "set_parameters"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds",
+            "description": "Duration in seconds (typically 0 for immediate application)",
+            "default": 0
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/SetParametersMetadata",
+            "description": "Metadata containing channels, user_name, input_delay, and trigger_voltage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "SetParametersRequest",
+        "description": "Request model for setting parameters.",
+        "example": {
+          "duration_seconds": 0,
+          "measurement_type": "set_parameters",
+          "metadata": {
+            "channels": [
+              1,
+              2
+            ],
+            "input_delay": 1000,
+            "trigger_voltage": 0.5,
+            "user_name": "abc-123-def"
+          }
+        }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

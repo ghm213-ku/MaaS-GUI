@@ -56,6 +56,7 @@ class ChannelNodeWidget(QFrame):
         super().__init__(parent)
         self.channel_id = channel_id
         self.is_active = False
+        self.booked_by = None
         
         self.trigger_val = 0.5
         self.delay_val = 0
@@ -72,9 +73,16 @@ class ChannelNodeWidget(QFrame):
         self.lbl_dly = QLabel(f"{self.delay_val}ps")
         self.lbl_dly.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_dly.setStyleSheet("font-family: 'Segoe UI', Arial; font-size: 9px; border: none; background: transparent; color: #555;")
+
+        self.lbl_user = QLabel("")
+        self.lbl_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_user.setStyleSheet("font-family: 'Segoe UI', Arial; font-size: 9px; border: none; background: transparent; color: #333; font-weight: bold;")
+        self.lbl_user.setWordWrap(True)
+        self.lbl_user.hide()
         
         self.layout.addWidget(self.lbl_trig)
         self.layout.addWidget(self.lbl_dly)
+        self.layout.addWidget(self.lbl_user)
         
         self.update_style()
         
@@ -89,17 +97,36 @@ class ChannelNodeWidget(QFrame):
             self.lbl_trig.setText(f"{t}V")
             self.lbl_dly.setText(f"{d}ps")
             
+    def set_booked_by(self, user_name):
+        self.booked_by = user_name
+        self.is_active = False
+        self.lbl_trig.hide()
+        self.lbl_dly.hide()
+        self.lbl_user.setText(user_name)
+        self.lbl_user.show()
+        self.setToolTip(f"Booked by: {user_name}")
+        self.update_style()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # Dynamically scale font size with width, min 9px
         font_size = max(9, int(self.width() * 0.16))
         self.lbl_trig.setStyleSheet(f"font-family: 'Segoe UI', Arial; font-size: {font_size}px; border: none; background: transparent; color: #555;")
         self.lbl_dly.setStyleSheet(f"font-family: 'Segoe UI', Arial; font-size: {font_size}px; border: none; background: transparent; color: #555;")
+        self.lbl_user.setStyleSheet(f"font-family: 'Segoe UI', Arial; font-size: {max(8, int(self.width() * 0.14))}px; border: none; background: transparent; color: #333; font-weight: bold;")
         self.update_style()
         
     def update_style(self):
         radius = self.width() // 2
-        if self.is_active:
+        if self.booked_by:
+            self.setStyleSheet(f"""
+                ChannelNodeWidget {{
+                    background-color: #d3d3d3;
+                    border: 1px solid #a9a9a9;
+                    border-radius: {radius}px;
+                }}
+            """)
+        elif self.is_active:
             self.setStyleSheet(f"""
                 ChannelNodeWidget {{
                     background-color: #e3f2fd;
@@ -117,6 +144,10 @@ class ChannelNodeWidget(QFrame):
             """)
             
     def mousePressEvent(self, event):
+        if self.booked_by:
+            super().mousePressEvent(event)
+            return
+
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_active = not self.is_active
             self.update_style()
@@ -222,9 +253,26 @@ class MainWindow(QMainWindow):
         user_layout = QHBoxLayout()
         user_layout.addWidget(QLabel("User Name:"))
         self.user_name_input = QLineEdit("maas-gui-client")
-        self.user_name_input.setFixedWidth(200)
+        self.user_name_input.setFixedWidth(150)
         self.user_name_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
         user_layout.addWidget(self.user_name_input)
+        
+        user_layout.addSpacing(20)
+        user_layout.addWidget(QLabel("Duration (mins):"))
+        self.duration_input = QLineEdit("60")
+        self.duration_input.setFixedWidth(60)
+        self.duration_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
+        self.duration_input.setValidator(QIntValidator(1, 10000))
+        user_layout.addWidget(self.duration_input)
+        
+        user_layout.addSpacing(20)
+        user_layout.addWidget(QLabel("Refresh (Hz):"))
+        self.refresh_input = QLineEdit("25")
+        self.refresh_input.setFixedWidth(40)
+        self.refresh_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
+        self.refresh_input.setValidator(QIntValidator(1, 100))
+        user_layout.addWidget(self.refresh_input)
+        
         user_layout.addStretch()
         layout.addLayout(user_layout)
         
@@ -272,6 +320,22 @@ class MainWindow(QMainWindow):
         grid_scroll.setWidgetResizable(True)
         
         layout.addWidget(grid_scroll)
+        
+        self.fetch_booked_channels()
+
+    def fetch_booked_channels(self):
+        try:
+            resp = requests.get("http://localhost:8000/api/v1/channels", timeout=2)
+            if resp.status_code == 200:
+                channels_info = resp.json().get("channels", [])
+                for ch_info in channels_info:
+                    ch_num = ch_info.get("channel_number")
+                    status = ch_info.get("status")
+                    user_name = ch_info.get("user_name")
+                    if status == "booked" and ch_num in self.channel_nodes:
+                        self.channel_nodes[ch_num].set_booked_by(user_name)
+        except Exception as e:
+            print(f"Failed to fetch booked channels: {e}")
 
     def build_counter_tab(self):
         self.counter_tab = QWidget()
@@ -485,7 +549,19 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Invalid Name", "Please enter a user name.")
                 return
                 
-            self.worker = CountRateWorker(channels, user_name, binwidth, n_values)
+            try:
+                duration_minutes = int(self.duration_input.text())
+            except ValueError:
+                QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for duration.")
+                return
+                
+            try:
+                refresh_rate = int(self.refresh_input.text())
+            except ValueError:
+                QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for refresh rate.")
+                return
+                
+            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, duration_minutes, refresh_rate)
             
             if self.worker.booking_error:
                 QMessageBox.critical(self, "Booking Failed", self.worker.booking_error)

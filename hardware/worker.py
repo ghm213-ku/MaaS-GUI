@@ -1,7 +1,7 @@
 import numpy as np
 import json
 import requests
-import redis
+import websocket
 from PyQt6.QtCore import QThread, pyqtSignal
 
 class CountRateWorker(QThread):
@@ -10,17 +10,19 @@ class CountRateWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray)
 
-    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000):
+    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, duration_minutes=60, refresh_rate=25):
         super().__init__()
         self.channels = channels
         self.running = True
         self.user_name = user_name
         self.binwidth = binwidth
         self.n_values = n_values
+        self.duration_minutes = duration_minutes
+        self.refresh_rate = refresh_rate
         self.base_url = "http://localhost:8000/api/v1"
+        self.ws_base_url = "ws://localhost:8000/api/v1"
         self.measurement_id = None
-        self.redis_client = None
-        self.pubsub = None
+        self.ws = None
         self.is_paused = False
         self.booking_error = None
 
@@ -68,12 +70,13 @@ class CountRateWorker(QThread):
             # 1. Start the measurement
             payload = {
                 "measurement_type": "count_rate_live",
-                "duration_seconds": 3600, # Run for 1 hour
+                "duration_seconds": self.duration_minutes * 60,
                 "metadata": {
                     "channels": self.channels,
                     "user_name": self.user_name,
                     "binwidth": int(self.binwidth),
-                    "n_values": int(self.n_values)
+                    "n_values": int(self.n_values),
+                    "refresh_rate": self.refresh_rate
                 }
             }
             resp = requests.post(f"{self.base_url}/measurements/count-rate-live", json=payload)
@@ -85,22 +88,26 @@ class CountRateWorker(QThread):
                 print("No measurement_id returned by the API!")
                 return
 
-            # 2. Connect to Redis Pub/Sub
-            self.redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
-            self.pubsub = self.redis_client.pubsub()
-            channel_name = f"measurement:data:{self.measurement_id}"
-            self.pubsub.subscribe(channel_name)
+            # 2. Connect to WebSocket stream
+            ws_url = f"{self.ws_base_url}/measurements/stream/{self.measurement_id}"
+            self.ws = websocket.create_connection(ws_url)
+            
+            timeout_val = 1.0 / self.refresh_rate if self.refresh_rate > 0 else 0.04
+            self.ws.settimeout(timeout_val)
 
-            # Polling loop at roughly 25Hz
             while self.running:
-                # get_message doesn't strictly block for exact time, so we use timeout
-                msg = self.pubsub.get_message(ignore_subscribe_messages=True, timeout=0.04)
-                if msg:
-                    if not self.is_paused:
+                try:
+                    msg = self.ws.recv()
+                    if msg and not self.is_paused:
                         try:
-                            msg_data = json.loads(msg["data"])
-                            # Extract the data array and make it robust to 1D or 2D shapes
-                            rates_raw = msg_data.get("data", [])
+                            # Depending on if backend forwards raw redis string or re-serializes
+                            msg_data = json.loads(msg)
+                            # Handle both raw list and {"data": list} dictionary payload
+                            if isinstance(msg_data, dict) and "data" in msg_data:
+                                rates_raw = msg_data.get("data", [])
+                            else:
+                                rates_raw = msg_data
+
                             rates_arr = np.array(rates_raw)
                             
                             if rates_arr.ndim == 1:
@@ -111,10 +118,13 @@ class CountRateWorker(QThread):
                                 # Emit the raw counts per bin directly (num_channels, n_values)
                                 self.newDataReady.emit(rates_arr)
                         except Exception as e:
-                            print(f"Error parsing redis message: {e}")
-                else:
-                    # If timeout reached and no message, it just loops again
+                            print(f"Error parsing websocket message: {e}")
+                except websocket.WebSocketTimeoutException:
                     pass
+                except websocket.WebSocketConnectionClosedException:
+                    if self.running:
+                        print("WebSocket closed by server.")
+                    break
                 
         except Exception as e:
             print(f"Hardware/Network Error: {e}")
@@ -126,16 +136,10 @@ class CountRateWorker(QThread):
             return
         self._teardown_done = True
 
-        # Unsubscribe and close redis
-        if self.pubsub:
+        # Close WebSocket
+        if self.ws:
             try:
-                self.pubsub.unsubscribe()
-                self.pubsub.close()
-            except:
-                pass
-        if self.redis_client:
-            try:
-                self.redis_client.close()
+                self.ws.close()
             except:
                 pass
 
