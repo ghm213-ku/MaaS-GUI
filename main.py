@@ -1,9 +1,22 @@
 import sys
+import logging
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QPen
 from PyQt6.QtCore import Qt
 
 if __name__ == '__main__':
+    # Setup robust logging for the entire application
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler("maas_gui.log", mode='a'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    logger.info("Starting MaaS GUI Application")
+    
     app = QApplication(sys.argv)
     
     # Create a modern looking splash screen pixmap

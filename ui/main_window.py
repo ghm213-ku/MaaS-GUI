@@ -1,5 +1,10 @@
 import numpy as np
 import requests
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
 # pyrefly: ignore [missing-import]
 import pyqtgraph as pg
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
@@ -57,6 +62,7 @@ class ChannelNodeWidget(QFrame):
         self.channel_id = channel_id
         self.is_active = False
         self.booked_by = None
+        self.is_current_user = False
         
         self.trigger_val = 0.5
         self.delay_val = 0
@@ -73,16 +79,9 @@ class ChannelNodeWidget(QFrame):
         self.lbl_dly = QLabel(f"{self.delay_val}ps")
         self.lbl_dly.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_dly.setStyleSheet("font-family: 'Segoe UI', Arial; font-size: 9px; border: none; background: transparent; color: #555;")
-
-        self.lbl_user = QLabel("")
-        self.lbl_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_user.setStyleSheet("font-family: 'Segoe UI', Arial; font-size: 9px; border: none; background: transparent; color: #333; font-weight: bold;")
-        self.lbl_user.setWordWrap(True)
-        self.lbl_user.hide()
         
         self.layout.addWidget(self.lbl_trig)
         self.layout.addWidget(self.lbl_dly)
-        self.layout.addWidget(self.lbl_user)
         
         self.update_style()
         
@@ -97,13 +96,15 @@ class ChannelNodeWidget(QFrame):
             self.lbl_trig.setText(f"{t}V")
             self.lbl_dly.setText(f"{d}ps")
             
-    def set_booked_by(self, user_name):
+    def set_booked_by(self, user_name, is_current_user):
         self.booked_by = user_name
-        self.is_active = False
-        self.lbl_trig.hide()
-        self.lbl_dly.hide()
-        self.lbl_user.setText(user_name)
-        self.lbl_user.show()
+        self.is_current_user = is_current_user
+        if is_current_user:
+            self.is_active = True
+        else:
+            self.is_active = False
+            self.lbl_trig.hide()
+            self.lbl_dly.hide()
         self.setToolTip(f"Booked by: {user_name}")
         self.update_style()
 
@@ -113,12 +114,11 @@ class ChannelNodeWidget(QFrame):
         font_size = max(9, int(self.width() * 0.16))
         self.lbl_trig.setStyleSheet(f"font-family: 'Segoe UI', Arial; font-size: {font_size}px; border: none; background: transparent; color: #555;")
         self.lbl_dly.setStyleSheet(f"font-family: 'Segoe UI', Arial; font-size: {font_size}px; border: none; background: transparent; color: #555;")
-        self.lbl_user.setStyleSheet(f"font-family: 'Segoe UI', Arial; font-size: {max(8, int(self.width() * 0.14))}px; border: none; background: transparent; color: #333; font-weight: bold;")
         self.update_style()
         
     def update_style(self):
         radius = self.width() // 2
-        if self.booked_by:
+        if self.booked_by and not self.is_current_user:
             self.setStyleSheet(f"""
                 ChannelNodeWidget {{
                     background-color: #d3d3d3;
@@ -134,6 +134,14 @@ class ChannelNodeWidget(QFrame):
                     border-radius: {radius}px;
                 }}
             """)
+        elif self.booked_by and self.is_current_user:
+            self.setStyleSheet(f"""
+                ChannelNodeWidget {{
+                    background-color: #e8f5e9;
+                    border: 1px solid #4caf50;
+                    border-radius: {radius}px;
+                }}
+            """)
         else:
             self.setStyleSheet(f"""
                 ChannelNodeWidget {{
@@ -144,7 +152,7 @@ class ChannelNodeWidget(QFrame):
             """)
             
     def mousePressEvent(self, event):
-        if self.booked_by:
+        if self.booked_by and not self.is_current_user:
             super().mousePressEvent(event)
             return
 
@@ -159,18 +167,51 @@ class ChannelNodeWidget(QFrame):
 class ChannelNodeContainer(QWidget):
     def __init__(self, channel_id, parent=None):
         super().__init__(parent)
-        self.layout = QGridLayout(self)
+        self.full_user_name = ""
+        self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(4)
+        
         self.node = ChannelNodeWidget(channel_id, self)
-        self.layout.addWidget(self.node, 0, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        self.lbl_user = QLabel(" ")
+        self.lbl_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_user.setFixedHeight(12)
+        
+        self.layout.addStretch()
+        self.layout.addWidget(self.node, 0, Qt.AlignmentFlag.AlignCenter)
+        self.layout.addWidget(self.lbl_user, 0, Qt.AlignmentFlag.AlignCenter)
+        self.layout.addStretch()
+        
+    def set_booked_by(self, user_name, is_current_user):
+        self.node.set_booked_by(user_name, is_current_user)
+        self.full_user_name = user_name
+        
+        # Keep text dark grey regardless of user
+        self.lbl_user.setStyleSheet("font-family: 'Segoe UI', Arial; font-size: 10px; font-weight: bold; color: #555;")
+        self.update_elided_text()
+        
+    def update_elided_text(self):
+        if not self.full_user_name:
+            self.lbl_user.setText(" ")
+            return
+            
+        # The container width represents the total horizontal space for this cell
+        available_width = self.width() - 8
+        if available_width < 10:
+            return
+            
+        metrics = self.lbl_user.fontMetrics()
+        elided = metrics.elidedText(self.full_user_name, Qt.TextElideMode.ElideRight, available_width)
+        self.lbl_user.setText(elided)
         
     def resizeEvent(self, event):
-        # Keep the node perfectly square and bounded by the container's smallest dimension
         side = min(self.width(), self.height()) - 4
-        # Clamp size to prevent getting absurdly large or too small
-        side = max(46, min(side, 120))
+        side -= self.lbl_user.height()
+        side = max(40, min(side, 120))
         self.node.setFixedSize(side, side)
         super().resizeEvent(event)
+        self.update_elided_text()
 
 
 from PyQt6.QtWidgets import QStyle
@@ -303,7 +344,7 @@ class MainWindow(QMainWindow):
                 ch = col
                 container = ChannelNodeContainer(ch)
                 grid_layout.addWidget(container, row + 1, col)
-                self.channel_nodes[ch] = container.node
+                self.channel_nodes[ch] = container
 
         # Spacing and stretching to take up full space correctly
         grid_layout.setHorizontalSpacing(15)
@@ -328,14 +369,16 @@ class MainWindow(QMainWindow):
             resp = requests.get("http://localhost:8000/api/v1/channels", timeout=2)
             if resp.status_code == 200:
                 channels_info = resp.json().get("channels", [])
+                current_user = self.user_name_input.text().strip()
                 for ch_info in channels_info:
                     ch_num = ch_info.get("channel_number")
                     status = ch_info.get("status")
                     user_name = ch_info.get("user_name")
                     if status == "booked" and ch_num in self.channel_nodes:
-                        self.channel_nodes[ch_num].set_booked_by(user_name)
+                        is_current = (user_name == current_user)
+                        self.channel_nodes[ch_num].set_booked_by(user_name, is_current)
         except Exception as e:
-            print(f"Failed to fetch booked channels: {e}")
+            logger.error(f"Failed to fetch booked channels: {e}")
 
     def build_counter_tab(self):
         self.counter_tab = QWidget()
@@ -367,6 +410,12 @@ class MainWindow(QMainWindow):
         self.btn_zoom.setCheckable(True)
         self.btn_zoom.clicked.connect(self.toggle_zoom)
         
+        self.btn_export = QPushButton("Export")
+        self.btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
+        self.btn_export.setToolTip("Export Data")
+        self.btn_export.setEnabled(False)
+        self.btn_export.clicked.connect(self.export_data)
+        
         self.binwidth_input = QLineEdit("1e9") # 1e9
         self.binwidth_input.setMaximumWidth(100)
         self.n_values_input = QLineEdit("1000")
@@ -376,6 +425,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.btn_pause)
         controls.addWidget(self.btn_reset)
         controls.addWidget(self.btn_zoom)
+        controls.addWidget(self.btn_export)
         
         controls.addSpacing(20)
         controls.addWidget(QLabel("Binwidth (ps):"))
@@ -461,8 +511,8 @@ class MainWindow(QMainWindow):
 
     def get_selected_channels(self):
         channels = []
-        for ch, node in self.channel_nodes.items():
-            if node.is_active:
+        for ch, container in self.channel_nodes.items():
+            if container.node.is_active:
                 channels.append(ch)
         return sorted(channels)
 
@@ -570,6 +620,7 @@ class MainWindow(QMainWindow):
                 
             self.worker.newDataReady.connect(self.update_plot)
             self.worker.start()
+            logger.info(f"Measurement started successfully for user {user_name} on channels {channels}")
         else:
             self.worker.is_paused = False
         
@@ -583,6 +634,7 @@ class MainWindow(QMainWindow):
             if i < rates_2d.shape[0]:
                 self.data_buffers[i] = rates_2d[i]
                 self.plot_curves[i].setData(self.data_buffers[i])
+        self.btn_export.setEnabled(True)
 
     def pause_measurement(self):
         if self.worker:
@@ -617,7 +669,36 @@ class MainWindow(QMainWindow):
         self.btn_start.setEnabled(True)
         self.btn_pause.setEnabled(False)
         self.btn_reset.setEnabled(False)
+        self.btn_export.setEnabled(False)
         self.tabs.setTabEnabled(0, True)
+
+    def export_data(self):
+        if not getattr(self, 'data_buffers', None) or not getattr(self, 'active_channels_list', None):
+            QMessageBox.warning(self, "No Data", "There is no data to export.")
+            return
+            
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Plot Data", "", "NumPy Files (*.npy);;All Files (*)"
+        )
+        if not file_path:
+            return
+            
+        try:
+            n_bins = len(self.data_buffers[0])
+            bins = np.arange(n_bins)
+            data_to_save = np.column_stack([bins] + self.data_buffers)
+            
+            # np.save automatically appends .npy if not present
+            np.save(file_path, data_to_save)
+            
+            # Ensure the success message shows the actual file path that was written
+            final_path = file_path if file_path.endswith('.npy') else file_path + '.npy'
+            logger.info(f"Exported data successfully to {final_path}")
+            QMessageBox.information(self, "Export Successful", f"Data successfully saved to:\n{final_path}")
+        except Exception as e:
+            logger.error(f"Export Failed: {e}")
+            QMessageBox.critical(self, "Export Failed", f"An error occurred while saving:\n{e}")
 
     def closeEvent(self, event):
         # Ensure hardware is freed if the user closes the window while running

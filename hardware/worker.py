@@ -2,7 +2,10 @@ import numpy as np
 import json
 import requests
 import websocket
+import logging
 from PyQt6.QtCore import QThread, pyqtSignal
+
+logger = logging.getLogger(__name__)
 
 class CountRateWorker(QThread):
     """
@@ -29,38 +32,39 @@ class CountRateWorker(QThread):
         # Book channels with a slight retry in case an old worker is still tearing down
         for attempt in range(5):
             try:
-                resp = requests.post(f"{self.base_url}/channels/book", json={
-                    "user_name": self.user_name,
-                    "channel_numbers": self.channels
-                })
-                resp.raise_for_status()
-                break
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 409:
-                    # Check who booked the channels
-                    try:
-                        channels_info = requests.get(f"{self.base_url}/channels").json().get("channels", [])
-                        conflict_users = set()
-                        for ch_info in channels_info:
-                            if ch_info["channel_number"] in self.channels and ch_info.get("status") == "booked":
-                                # Only report conflict if it's a different user
-                                if ch_info.get("user_name") != self.user_name:
-                                    conflict_users.add(ch_info.get("user_name", "Unknown"))
-                        
-                        if conflict_users:
-                            self.booking_error = f"Channels are already booked by: {', '.join(conflict_users)}"
-                            break
-                        else:
-                            # They are booked by US! We can proceed.
-                            break
-                    except Exception as inner_e:
-                        print(f"Failed to check channel status: {inner_e}")
+                # 1. Check current status of all requested channels
+                channels_info = requests.get(f"{self.base_url}/channels", timeout=2).json().get("channels", [])
                 
-                if attempt == 4:
-                    print(f"Failed to book channels: {e}")
+                conflict_users = set()
+                channels_to_book = []
+                
+                for ch in self.channels:
+                    ch_status = next((c for c in channels_info if c["channel_number"] == ch), None)
+                    if ch_status and ch_status.get("status") == "booked":
+                        if ch_status.get("user_name") != self.user_name:
+                            conflict_users.add(ch_status.get("user_name", "Unknown"))
+                    else:
+                        channels_to_book.append(ch)
+                        
+                if conflict_users:
+                    self.booking_error = f"Channels are already booked by: {', '.join(conflict_users)}"
+                    break
+                    
+                # 2. Book ONLY the channels that are currently available
+                if channels_to_book:
+                    resp = requests.post(f"{self.base_url}/channels/book", json={
+                        "user_name": self.user_name,
+                        "channel_numbers": channels_to_book
+                    }, timeout=2)
+                    resp.raise_for_status()
+                    
+                # If we got here, all requested channels are booked by us
+                break
+                
             except Exception as e:
                 if attempt == 4:
-                    print(f"Failed to book channels (they might already be booked or backend is down): {e}")
+                    logger.error(f"Failed to book channels: {e}")
+                    self.booking_error = f"Failed to book channels: {e}"
                 else:
                     import time
                     time.sleep(0.2)
@@ -79,18 +83,21 @@ class CountRateWorker(QThread):
                     "refresh_rate": self.refresh_rate
                 }
             }
+            logger.info("Sending measurement request to backend API (this may take ~2 seconds for hardware init)...")
             resp = requests.post(f"{self.base_url}/measurements/count-rate-live", json=payload)
             resp.raise_for_status()
             data = resp.json()
             self.measurement_id = data.get("measurement_id")
 
             if not self.measurement_id:
-                print("No measurement_id returned by the API!")
+                logger.error("No measurement_id returned by the API!")
                 return
 
             # 2. Connect to WebSocket stream
             ws_url = f"{self.ws_base_url}/measurements/stream/{self.measurement_id}"
+            logger.info(f"Connecting to WebSocket: {ws_url}")
             self.ws = websocket.create_connection(ws_url)
+            logger.info("WebSocket connected successfully!")
             
             timeout_val = 1.0 / self.refresh_rate if self.refresh_rate > 0 else 0.04
             self.ws.settimeout(timeout_val)
@@ -118,16 +125,16 @@ class CountRateWorker(QThread):
                                 # Emit the raw counts per bin directly (num_channels, n_values)
                                 self.newDataReady.emit(rates_arr)
                         except Exception as e:
-                            print(f"Error parsing websocket message: {e}")
+                            logger.error(f"Error parsing websocket message: {e}")
                 except websocket.WebSocketTimeoutException:
                     pass
                 except websocket.WebSocketConnectionClosedException:
                     if self.running:
-                        print("WebSocket closed by server.")
+                        logger.warning("WebSocket closed by server.")
                     break
                 
         except Exception as e:
-            print(f"Hardware/Network Error: {e}")
+            logger.error(f"Hardware/Network Error: {e}")
         finally:
             self._perform_teardown()
 
@@ -145,17 +152,23 @@ class CountRateWorker(QThread):
 
         # Stop measurement
         if self.measurement_id:
-            try:
-                # Use a timeout so it doesn't hang forever
-                requests.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=2)
-            except Exception as e:
-                print(f"Failed to stop measurement: {e}")
+            for attempt in range(2):
+                try:
+                    # Increased timeout to 5 seconds to avoid ReadTimeout on busy backend
+                    requests.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=5)
+                    logger.info(f"Successfully stopped measurement {self.measurement_id}")
+                    break
+                except Exception as e:
+                    logger.error(f"Failed to stop measurement (attempt {attempt+1}): {e}")
 
         # Release channels
-        try:
-            requests.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=2)
-        except Exception as e:
-            print(f"Failed to release channels: {e}")
+        for attempt in range(2):
+            try:
+                requests.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=5)
+                logger.info(f"Successfully released channels for {self.user_name}")
+                break
+            except Exception as e:
+                logger.error(f"Failed to release channels (attempt {attempt+1}): {e}")
             
     def force_teardown(self):
         """Called by the GUI on exit to ensure teardown runs synchronously before process death."""

@@ -1,0 +1,54 @@
+2026-08-17 16:20:59,301 [INFO] __main__: Starting MaaS GUI Application
+2026-08-17 16:26:28,878 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:26:30,920 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/14cbee04-b355-4498-8784-d47605ebbd1a
+2026-08-17 16:26:50,395 [INFO] hardware.worker: Successfully stopped measurement 14cbee04-b355-4498-8784-d47605ebbd1a
+2026-08-17 16:26:52,470 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:26:59,545 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:27:01,616 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/89b34811-b765-4da8-a47c-97bb292e05cc
+2026-08-17 16:27:51,640 [INFO] hardware.worker: Successfully stopped measurement 89b34811-b765-4da8-a47c-97bb292e05cc
+2026-08-17 16:27:53,703 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:27:57,996 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:28:00,047 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/af13ceb4-601a-460e-a221-4dd817116d33
+2026-08-17 16:29:04,039 [INFO] hardware.worker: Successfully stopped measurement af13ceb4-601a-460e-a221-4dd817116d33
+2026-08-17 16:29:06,098 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:36:09,055 [INFO] __main__: Starting MaaS GUI Application
+2026-08-17 16:37:15,600 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:37:15,602 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:37:17,658 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/6ed65009-9faf-434f-9c49-6238edb8e53b
+2026-08-17 16:37:19,690 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-17 16:38:15,999 [INFO] hardware.worker: Successfully stopped measurement 6ed65009-9faf-434f-9c49-6238edb8e53b
+2026-08-17 16:38:18,039 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:39:50,680 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:39:50,681 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:39:52,745 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/06fe2551-35dc-48f7-a955-dc41ee225ea4
+2026-08-17 16:39:54,770 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-17 16:40:10,492 [INFO] hardware.worker: Successfully stopped measurement 06fe2551-35dc-48f7-a955-dc41ee225ea4
+2026-08-17 16:40:12,544 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:40:18,934 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:40:18,935 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:40:21,004 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/3199ea8b-94e0-4849-89a2-525bd78021bf
+2026-08-17 16:40:23,022 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-17 16:41:23,784 [INFO] hardware.worker: Successfully stopped measurement 3199ea8b-94e0-4849-89a2-525bd78021bf
+2026-08-17 16:41:25,865 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:41:35,353 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:41:35,355 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:41:37,406 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/01de6c8f-a56e-47c8-aa92-d3da18ec22cc
+2026-08-17 16:41:39,435 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-17 16:42:51,229 [INFO] hardware.worker: Successfully stopped measurement 01de6c8f-a56e-47c8-aa92-d3da18ec22cc
+2026-08-17 16:42:53,275 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:43:04,724 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:43:04,726 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:43:06,768 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/52137259-7eeb-4e8f-88dc-f84b56ef47e9
+2026-08-17 16:43:08,805 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-17 16:44:35,232 [INFO] hardware.worker: Successfully stopped measurement 52137259-7eeb-4e8f-88dc-f84b56ef47e9
+2026-08-17 16:44:37,298 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:44:43,140 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:44:43,142 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:44:45,200 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/2ffa4df2-d847-49c0-8da4-cb8c927989fa
+2026-08-17 16:44:47,246 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-17 16:45:14,049 [INFO] hardware.worker: Successfully stopped measurement 2ffa4df2-d847-49c0-8da4-cb8c927989fa
+2026-08-17 16:45:16,153 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-17 16:45:19,428 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3]
+2026-08-17 16:45:19,430 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init)...
+2026-08-17 16:45:21,520 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/7feec4e3-6db6-457c-accf-186b5905c148
+2026-08-17 16:45:23,565 [INFO] hardware.worker: WebSocket connected successfully!
