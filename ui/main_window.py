@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QMessageBox,
                              QTabWidget, QGridLayout, QScrollArea, QCheckBox,
-                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy)
+                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox)
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -91,6 +91,7 @@ class ChannelNodeWidget(QFrame):
         popup.move(QCursor.pos())
         if popup.exec() == QDialog.DialogCode.Accepted:
             t, d = popup.get_values()
+            logger.info(f"Updated Channel {self.channel_id} settings: Trigger={t}V, Delay={d}ps")
             self.trigger_val = t
             self.delay_val = d
             self.lbl_trig.setText(f"{t}V")
@@ -158,6 +159,7 @@ class ChannelNodeWidget(QFrame):
 
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_active = not self.is_active
+            logger.info(f"Channel {self.channel_id} toggled to {'active' if self.is_active else 'inactive'}")
             self.update_style()
             self.toggled.emit(self.channel_id, self.is_active)
         elif event.button() == Qt.MouseButton.RightButton:
@@ -306,14 +308,6 @@ class MainWindow(QMainWindow):
         self.duration_input.setValidator(QIntValidator(1, 10000))
         user_layout.addWidget(self.duration_input)
         
-        user_layout.addSpacing(20)
-        user_layout.addWidget(QLabel("Refresh (Hz):"))
-        self.refresh_input = QLineEdit("25")
-        self.refresh_input.setFixedWidth(40)
-        self.refresh_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
-        self.refresh_input.setValidator(QIntValidator(1, 100))
-        user_layout.addWidget(self.refresh_input)
-        
         user_layout.addStretch()
         layout.addLayout(user_layout)
         
@@ -369,6 +363,7 @@ class MainWindow(QMainWindow):
             resp = requests.get("http://localhost:8000/api/v1/channels", timeout=2)
             if resp.status_code == 200:
                 channels_info = resp.json().get("channels", [])
+                logger.info(f"Fetched channel status from backend. Found {len(channels_info)} channels.")
                 current_user = self.user_name_input.text().strip()
                 for ch_info in channels_info:
                     ch_num = ch_info.get("channel_number")
@@ -406,11 +401,16 @@ class MainWindow(QMainWindow):
         
         self.btn_zoom = QPushButton("⌕")
         self.btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self.btn_zoom.setToolTip("Zoom Tool")
         self.btn_zoom.setCheckable(True)
+        self.btn_zoom.setToolTip("Toggle Zoom Mode")
         self.btn_zoom.clicked.connect(self.toggle_zoom)
+
+        self.btn_auto_range = QPushButton("⤢")
+        self.btn_auto_range.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.btn_auto_range.setToolTip("Enable continuous Auto Range")
+        self.btn_auto_range.clicked.connect(self.force_auto_range)
         
-        self.btn_export = QPushButton("Export")
+        self.btn_export = QPushButton()
         self.btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
         self.btn_export.setToolTip("Export Data")
         self.btn_export.setEnabled(False)
@@ -421,16 +421,25 @@ class MainWindow(QMainWindow):
         self.n_values_input = QLineEdit("1000")
         self.n_values_input.setMaximumWidth(80)
         
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Free Running", "Single", "Repeating"])
+        self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
+        
         controls.addWidget(self.btn_start)
         controls.addWidget(self.btn_pause)
         controls.addWidget(self.btn_reset)
         controls.addWidget(self.btn_zoom)
+        controls.addWidget(self.btn_auto_range)
         controls.addWidget(self.btn_export)
         
         controls.addSpacing(20)
-        controls.addWidget(QLabel("Binwidth (ps):"))
+        controls.addWidget(QLabel("Mode:"))
+        controls.addWidget(self.mode_combo)
+        
+        controls.addSpacing(10)
+        controls.addWidget(QLabel("Bin_width (ps):"))
         controls.addWidget(self.binwidth_input)
-        controls.addWidget(QLabel("n_values:"))
+        controls.addWidget(QLabel("Bins:"))
         controls.addWidget(self.n_values_input)
         controls.addStretch()
         layout.addLayout(controls)
@@ -484,11 +493,31 @@ class MainWindow(QMainWindow):
         self.data_buffers = []
         self.active_channels_list = []
 
+    def on_mode_changed(self):
+        mode = self.mode_combo.currentText()
+        if mode == "Repeating":
+            self.binwidth_input.setEnabled(True)
+            self.binwidth_input.setText("1e12") # Default to 1 second bins for repeating
+            self.n_values_input.setText("1")
+            self.n_values_input.setEnabled(False)
+            self.plot_widget.setLabel('bottom', 'Time Steps')
+            self.plot_widget.setLabel('left', 'Total Counts')
+            self.plot_widget.setMouseEnabled(x=True, y=True)
+        else:
+            self.binwidth_input.setEnabled(True)
+            self.n_values_input.setEnabled(True)
+            self.plot_widget.setLabel('bottom', 'Bin Index')
+            self.plot_widget.setLabel('left', 'Counts / bin')
+            self.plot_widget.setMouseEnabled(x=True, y=True)
+
     def toggle_zoom(self, checked):
         if checked:
             self.plot_widget.getViewBox().setMouseMode(pg.ViewBox.RectMode)
         else:
             self.plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
+
+    def force_auto_range(self):
+        self.plot_widget.enableAutoRange()
 
     def mouse_moved(self, evt):
         pos = evt
@@ -547,6 +576,17 @@ class MainWindow(QMainWindow):
             self.plot_widget.addItem(self.v_line, ignoreBounds=True)
             self.plot_widget.addItem(self.tooltip_label, ignoreBounds=True)
             
+            mode = self.mode_combo.currentText()
+            if mode in ["Free Running", "Single"]:
+                # Remove limits so the magnifier tool works
+                self.plot_widget.getViewBox().setLimits(xMin=None, xMax=None, minXRange=None, maxXRange=None)
+                self.plot_widget.setXRange(0, n_values, padding=0)
+                self.plot_widget.enableAutoRange(axis='y')
+            else:
+                # Remove limits for Repeating mode
+                self.plot_widget.getViewBox().setLimits(xMin=None, xMax=None, minXRange=None, maxXRange=None)
+                self.plot_widget.enableAutoRange(axis='y')
+            
             # Clear old checkboxes
             for i in reversed(range(self.legend_layout.count())):
                 widget = self.legend_layout.itemAt(i).widget()
@@ -554,7 +594,15 @@ class MainWindow(QMainWindow):
                     widget.setParent(None)
             
             self.plot_curves = []
-            self.data_buffers = [np.zeros(n_values) for _ in channels]
+            
+            mode = self.mode_combo.currentText()
+            if mode == "Repeating":
+                # For repeating, we keep a dynamic list up to 1000 items
+                self.history_length = 1000
+                self.data_buffers = [[] for _ in channels]
+            else:
+                self.data_buffers = [np.zeros(n_values) for _ in channels]
+                
             self.active_channels_list = channels
             
             # Expanded variety of distinct colors
@@ -605,13 +653,23 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for duration.")
                 return
                 
-            try:
-                refresh_rate = int(self.refresh_input.text())
-            except ValueError:
-                QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for refresh rate.")
-                return
+            # Base refresh rate for Free Running / Single is 25Hz
+            refresh_rate = 25
                 
-            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, duration_minutes, refresh_rate)
+            mode = self.mode_combo.currentText()
+            
+            # Dynamic Y-axis label for Repeating mode based on binwidth
+            if mode == "Repeating":
+                if binwidth == 1e12:
+                    self.plot_widget.setLabel('left', 'Counts / 1s')
+                elif binwidth == 1e9:
+                    self.plot_widget.setLabel('left', 'Counts / 1ms')
+                elif binwidth == 1e6:
+                    self.plot_widget.setLabel('left', 'Counts / 1us')
+                else:
+                    self.plot_widget.setLabel('left', f'Counts / {binwidth}ps')
+            
+            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, duration_minutes, refresh_rate, mode=mode)
             
             if self.worker.booking_error:
                 QMessageBox.critical(self, "Booking Failed", self.worker.booking_error)
@@ -620,25 +678,51 @@ class MainWindow(QMainWindow):
                 
             self.worker.newDataReady.connect(self.update_plot)
             self.worker.start()
-            logger.info(f"Measurement started successfully for user {user_name} on channels {channels}")
+            logger.info(f"Measurement started successfully for user {user_name} on channels {channels} with binwidth={binwidth}, n_values={n_values}, duration={duration_minutes}m, refresh={refresh_rate}Hz")
         else:
             self.worker.is_paused = False
+            logger.info("Measurement resumed from pause.")
         
         self.btn_start.setEnabled(False)
         self.btn_pause.setEnabled(True)
         self.btn_reset.setEnabled(False)
+        self.binwidth_input.setEnabled(False)
+        self.n_values_input.setEnabled(False)
+        self.mode_combo.setEnabled(False)
         self.tabs.setTabEnabled(0, False) # Disable setup tab while running or paused
 
     def update_plot(self, rates_2d):
+        mode = self.mode_combo.currentText()
         for i in range(len(self.plot_curves)):
             if i < rates_2d.shape[0]:
-                self.data_buffers[i] = rates_2d[i]
-                self.plot_curves[i].setData(self.data_buffers[i])
+                if mode == "Free Running" or mode == "Single":
+                    self.data_buffers[i] += rates_2d[i]
+                elif mode == "Repeating":
+                    # Append new value, pop oldest if we exceed history
+                    val = rates_2d[i][0] if len(rates_2d[i]) > 0 else 0
+                    self.data_buffers[i].append(val)
+                    if len(self.data_buffers[i]) > self.history_length:
+                        self.data_buffers[i].pop(0)
+                
+                plot_data = self.data_buffers[i]
+                
+                self.plot_curves[i].setData(plot_data)
+                
+            if mode == "Repeating":
+                # Enforce a 60-point sliding window so points are spaced out nicely
+                current_len = max(len(buf) for buf in self.data_buffers)
+                window_size = 60
+                if current_len > window_size:
+                    self.plot_widget.setXRange(current_len - window_size, current_len, padding=0)
+                else:
+                    self.plot_widget.setXRange(0, window_size, padding=0)
+                    
         self.btn_export.setEnabled(True)
 
     def pause_measurement(self):
         if self.worker:
             self.worker.is_paused = True
+            logger.info("Measurement paused by user.")
             
         self.btn_start.setEnabled(True)
         self.btn_pause.setEnabled(False)
@@ -646,6 +730,7 @@ class MainWindow(QMainWindow):
 
     def reset_measurement(self):
         if self.worker:
+            logger.info("Resetting/stopping measurement by user.")
             self.worker.stop()
             self.worker = None
             
@@ -670,6 +755,13 @@ class MainWindow(QMainWindow):
         self.btn_pause.setEnabled(False)
         self.btn_reset.setEnabled(False)
         self.btn_export.setEnabled(False)
+        
+        mode = self.mode_combo.currentText()
+        if mode != "Repeating":
+            self.binwidth_input.setEnabled(True)
+            self.n_values_input.setEnabled(True)
+        self.mode_combo.setEnabled(True)
+        
         self.tabs.setTabEnabled(0, True)
 
     def export_data(self):
@@ -701,6 +793,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Export Failed", f"An error occurred while saving:\n{e}")
 
     def closeEvent(self, event):
+        logger.info("Application is closing. Tearing down hardware and measurements...")
         # Ensure hardware is freed if the user closes the window while running
         if self.worker:
             self.worker.force_teardown()

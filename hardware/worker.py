@@ -13,7 +13,7 @@ class CountRateWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray)
 
-    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, duration_minutes=60, refresh_rate=25):
+    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, duration_minutes=60, refresh_rate=25, mode="Free Running"):
         super().__init__()
         self.channels = channels
         self.running = True
@@ -22,6 +22,7 @@ class CountRateWorker(QThread):
         self.n_values = n_values
         self.duration_minutes = duration_minutes
         self.refresh_rate = refresh_rate
+        self.mode = mode
         self.base_url = "http://localhost:8000/api/v1"
         self.ws_base_url = "ws://localhost:8000/api/v1"
         self.measurement_id = None
@@ -72,18 +73,37 @@ class CountRateWorker(QThread):
     def run(self):
         try:
             # 1. Start the measurement
+            # Configure payload based on mode
+            if self.mode == "Repeating":
+                payload_binwidth = int(self.binwidth)
+                payload_n_values = 1 # Force exactly 1 bin
+                payload_refresh = int(max(1, min(100, 1e12 / self.binwidth))) # Derive Hz from binwidth, bound between 1-100Hz
+                payload_duration = self.duration_minutes * 60
+            elif self.mode == "Single":
+                self.exact_duration_sec = (self.n_values * self.binwidth) / 1e12
+                payload_binwidth = int(self.binwidth)
+                payload_n_values = int(self.n_values)
+                payload_refresh = self.refresh_rate # Use standard refresh rate
+                # Tell backend to run for a long time; the FRONTEND timer will cut it off precisely!
+                payload_duration = self.duration_minutes * 60
+            else: # Free Running
+                payload_binwidth = int(self.binwidth)
+                payload_n_values = int(self.n_values)
+                payload_refresh = self.refresh_rate
+                payload_duration = self.duration_minutes * 60
+
             payload = {
                 "measurement_type": "count_rate_live",
-                "duration_seconds": self.duration_minutes * 60,
+                "duration_seconds": payload_duration,
                 "metadata": {
                     "channels": self.channels,
                     "user_name": self.user_name,
-                    "binwidth": int(self.binwidth),
-                    "n_values": int(self.n_values),
-                    "refresh_rate": self.refresh_rate
+                    "binwidth": payload_binwidth,
+                    "n_values": payload_n_values,
+                    "refresh_rate": payload_refresh
                 }
             }
-            logger.info("Sending measurement request to backend API (this may take ~2 seconds for hardware init)...")
+            logger.info(f"Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: {self.mode}")
             resp = requests.post(f"{self.base_url}/measurements/count-rate-live", json=payload)
             resp.raise_for_status()
             data = resp.json()
@@ -96,12 +116,16 @@ class CountRateWorker(QThread):
             # 2. Connect to WebSocket stream
             ws_url = f"{self.ws_base_url}/measurements/stream/{self.measurement_id}"
             logger.info(f"Connecting to WebSocket: {ws_url}")
-            self.ws = websocket.create_connection(ws_url)
+            self.ws = websocket.WebSocket()
+            # Give the backend up to 10 seconds to accept the connection (hardware init can be slow)
+            self.ws.connect(ws_url, timeout=10.0)
+            # Reduce timeout for the recv loop so it checks self.running frequently
+            self.ws.settimeout(2.0)
             logger.info("WebSocket connected successfully!")
             
-            timeout_val = 1.0 / self.refresh_rate if self.refresh_rate > 0 else 0.04
-            self.ws.settimeout(timeout_val)
-
+            import time
+            start_time = None
+            
             while self.running:
                 try:
                     msg = self.ws.recv()
@@ -121,9 +145,21 @@ class CountRateWorker(QThread):
                                 # Reshape to 2D for consistency
                                 rates_arr = rates_arr.reshape(-1, 1)
                                 
+                            if start_time is None:
+                                start_time = time.time()
+                                
                             if rates_arr.shape[0] == len(self.channels):
+                                if self.mode == "Single":
+                                    logger.info(f"Received Single frame, shape: {rates_arr.shape}, sum: {rates_arr.sum()}")
+                                    
                                 # Emit the raw counts per bin directly (num_channels, n_values)
                                 self.newDataReady.emit(rates_arr)
+                                
+                                # If Single mode, stop after exact duration has elapsed
+                                if self.mode == "Single" and (time.time() - start_time) >= self.exact_duration_sec:
+                                    logger.info(f"Single measurement duration ({self.exact_duration_sec}s) complete. Stopping worker.")
+                                    self.running = False
+                                    break
                         except Exception as e:
                             logger.error(f"Error parsing websocket message: {e}")
                 except websocket.WebSocketTimeoutException:
