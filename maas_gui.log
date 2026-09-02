@@ -799,3 +799,313 @@
 2026-09-02 10:54:14,816 [INFO] hardware.worker: Successfully released channels for maas-gui-client
 2026-09-02 10:54:14,817 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
 2026-09-02 10:54:23,109 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 11:34:17,969 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 11:34:25,106 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 11:34:38,271 [INFO] hardware.histogram_worker: Attempting to book 1 channels via MaaS API: [1]
+2026-09-02 11:34:38,309 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:34:38,315 [ERROR] hardware.histogram_worker: Hardware/Network Error: 405 Client Error: Method Not Allowed for url: http://127.0.0.1:8000/api/v1/measurements/start-stop-live
+2026-09-02 11:34:38,332 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:42:11,145 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 11:46:07,236 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 11:46:14,901 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 11:46:20,056 [INFO] hardware.histogram_worker: Attempting to book 1 channels via MaaS API: [1]
+2026-09-02 11:46:20,070 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:46:20,102 [ERROR] hardware.histogram_worker: Hardware/Network Error: 405 Client Error: Method Not Allowed for url: http://127.0.0.1:8000/api/v1/measurements/startstop-live
+2026-09-02 11:46:20,131 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:46:27,485 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:46:27,530 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:46:27,532 [ERROR] hardware.histogram_worker: Hardware/Network Error: 405 Client Error: Method Not Allowed for url: http://127.0.0.1:8000/api/v1/measurements/startstop-live
+2026-09-02 11:46:27,569 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:47:23,369 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 11:47:29,274 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 11:47:31,113 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 11:47:37,763 [INFO] hardware.histogram_worker: Attempting to book 1 channels via MaaS API: [1]
+2026-09-02 11:47:37,790 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:47:37,808 [ERROR] hardware.histogram_worker: Hardware/Network Error: 422 Client Error: Unprocessable Content for url: http://127.0.0.1:8000/api/v1/measurements/startstop-live
+2026-09-02 11:47:37,822 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:48:05,963 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:48:05,973 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:48:05,988 [ERROR] hardware.histogram_worker: Hardware/Network Error: 422 Client Error: Unprocessable Content for url: http://127.0.0.1:8000/api/v1/measurements/startstop-live
+2026-09-02 11:48:06,003 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:48:24,083 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:48:24,109 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 11:48:24,135 [ERROR] hardware.histogram_worker: Hardware/Network Error: 422 Client Error: Unprocessable Content for url: http://127.0.0.1:8000/api/v1/measurements/histogram-live
+2026-09-02 11:48:24,169 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:48:29,589 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:48:29,621 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 11:48:29,627 [ERROR] hardware.histogram_worker: Hardware/Network Error: 422 Client Error: Unprocessable Content for url: http://127.0.0.1:8000/api/v1/measurements/correlation-live
+2026-09-02 11:48:29,666 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:50:04,770 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 11:50:08,149 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 11:50:10,075 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 11:50:16,684 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:50:16,718 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:50:16,753 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/e3de85ac-ecc6-4de6-a2f8-293043cbb53b
+2026-09-02 11:50:16,772 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 11:50:38,809 [INFO] hardware.histogram_worker: Successfully stopped measurement e3de85ac-ecc6-4de6-a2f8-293043cbb53b
+2026-09-02 11:50:38,846 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:50:41,432 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:50:41,471 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 11:50:41,503 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/4a166d3a-fe45-4047-ac7b-57b535644779
+2026-09-02 11:50:41,522 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 11:50:47,580 [INFO] hardware.histogram_worker: Successfully stopped measurement 4a166d3a-fe45-4047-ac7b-57b535644779
+2026-09-02 11:50:47,614 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:50:49,843 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:50:49,865 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 11:50:49,884 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/a2798c0c-0de9-4f1f-8c06-781e893534b1
+2026-09-02 11:50:49,906 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 11:50:55,066 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 11:50:55,939 [INFO] hardware.histogram_worker: Successfully stopped measurement a2798c0c-0de9-4f1f-8c06-781e893534b1
+2026-09-02 11:50:55,975 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 11:55:50,428 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 11:55:56,839 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 11:56:04,822 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 11:56:04,859 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 11:56:04,897 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/f19cef3c-01f6-4233-9a33-2e3a9c83dbdd
+2026-09-02 11:56:04,912 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 11:56:16,138 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 11:56:16,957 [INFO] hardware.histogram_worker: Successfully stopped measurement f19cef3c-01f6-4233-9a33-2e3a9c83dbdd
+2026-09-02 11:56:16,976 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 13:41:25,935 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 13:41:31,481 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 13:41:41,268 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 13:41:44,160 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 13:41:44,200 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/304a46a1-f63c-42b3-9e3d-0f9806683d5a
+2026-09-02 13:41:44,207 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 13:45:55,445 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 13:45:56,391 [INFO] hardware.histogram_worker: Successfully stopped measurement 304a46a1-f63c-42b3-9e3d-0f9806683d5a
+2026-09-02 13:45:56,429 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 13:46:01,349 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 13:46:03,300 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 13:46:17,538 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 13:46:17,556 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 13:46:17,595 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/f4f11082-6966-4b97-b192-62674d2c1b63
+2026-09-02 13:46:17,621 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 13:46:17,648 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 13:46:35,840 [INFO] hardware.histogram_worker: Successfully stopped measurement f4f11082-6966-4b97-b192-62674d2c1b63
+2026-09-02 13:46:35,874 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 13:46:39,332 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 13:46:39,368 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 13:46:39,421 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/3dd6ad5b-1732-43c2-848d-922d3f81d35b
+2026-09-02 13:46:39,427 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 13:46:40,097 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 13:46:56,275 [INFO] hardware.histogram_worker: Successfully stopped measurement 3dd6ad5b-1732-43c2-848d-922d3f81d35b
+2026-09-02 13:46:56,311 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 13:47:12,541 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 13:47:12,571 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 13:47:12,600 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/05be337e-48b3-4289-8174-499c3b2b5864
+2026-09-02 13:47:12,603 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 13:47:12,928 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 13:47:18,453 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 13:47:18,487 [INFO] hardware.histogram_worker: Successfully stopped measurement 05be337e-48b3-4289-8174-499c3b2b5864
+2026-09-02 13:47:18,531 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:13:42,197 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 15:13:47,698 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 15:13:55,984 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 15:13:56,020 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:13:56,040 [ERROR] hardware.histogram_worker: Hardware/Network Error: name 'data' is not defined
+2026-09-02 15:13:56,064 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:14:23,935 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:14:23,979 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:14:24,011 [ERROR] hardware.histogram_worker: Hardware/Network Error: name 'data' is not defined
+2026-09-02 15:14:24,047 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:14:45,836 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:14:45,869 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 15:14:45,926 [ERROR] hardware.histogram_worker: Hardware/Network Error: name 'data' is not defined
+2026-09-02 15:14:45,945 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:14:57,315 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 15:16:22,683 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 15:16:28,425 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 15:16:36,062 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:16:36,085 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:16:36,134 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/4796b76a-8176-4ea0-9812-07471d7a27e9
+2026-09-02 15:16:36,164 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:16:36,769 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 15:16:49,744 [INFO] hardware.histogram_worker: Successfully stopped measurement 4796b76a-8176-4ea0-9812-07471d7a27e9
+2026-09-02 15:16:49,784 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:16:58,900 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:16:58,931 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:16:58,989 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/4b765f8a-2531-4bf1-bc53-c102e457c0d6
+2026-09-02 15:16:59,021 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:16:59,895 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:17:30,427 [INFO] hardware.histogram_worker: Successfully stopped measurement 4b765f8a-2531-4bf1-bc53-c102e457c0d6
+2026-09-02 15:17:30,464 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:17:34,766 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:17:34,852 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 15:17:34,865 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/fa1c7cc9-5fb9-4b4d-ae67-e94ad9d8386e
+2026-09-02 15:17:34,889 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:17:34,925 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:17:53,616 [INFO] hardware.histogram_worker: Successfully stopped measurement fa1c7cc9-5fb9-4b4d-ae67-e94ad9d8386e
+2026-09-02 15:17:53,674 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:17:56,449 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:17:56,480 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:17:56,498 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/023c4cad-1963-4c3b-925e-49fba65f0a62
+2026-09-02 15:17:56,502 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:17:56,552 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1,))
+2026-09-02 15:18:10,202 [INFO] hardware.histogram_worker: Successfully stopped measurement 023c4cad-1963-4c3b-925e-49fba65f0a62
+2026-09-02 15:18:10,247 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:18:18,736 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:18:18,760 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:18:18,800 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/7cf6ecfe-cb2c-4b1b-9709-0b01dbc18186
+2026-09-02 15:18:18,837 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:18:18,851 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 15:19:11,435 [INFO] hardware.histogram_worker: Successfully stopped measurement 7cf6ecfe-cb2c-4b1b-9709-0b01dbc18186
+2026-09-02 15:19:11,466 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:19:32,895 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:19:32,938 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 15:19:32,982 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/f2d9de3b-81b9-46a2-8e65-d2062c10b99b
+2026-09-02 15:19:32,989 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:19:33,728 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:20:12,292 [INFO] hardware.histogram_worker: Successfully stopped measurement f2d9de3b-81b9-46a2-8e65-d2062c10b99b
+2026-09-02 15:20:12,327 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:20:21,865 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:20:21,906 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:20:21,959 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/da04f9f7-54ad-4b0c-9988-94751c876d40
+2026-09-02 15:20:21,988 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:20:22,456 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:20:47,284 [INFO] hardware.histogram_worker: Successfully stopped measurement da04f9f7-54ad-4b0c-9988-94751c876d40
+2026-09-02 15:20:47,322 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:20:55,080 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:20:55,118 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:20:55,154 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/abdc0793-bad0-4ae6-ae74-c8839460d078
+2026-09-02 15:20:55,170 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:20:55,466 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:21:09,780 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 15:21:09,857 [INFO] hardware.histogram_worker: Successfully stopped measurement abdc0793-bad0-4ae6-ae74-c8839460d078
+2026-09-02 15:21:09,900 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:34:37,574 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 15:34:46,610 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 15:35:15,995 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:35:16,015 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:35:16,035 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/450b32ba-48b6-4b71-8067-ea145202356d
+2026-09-02 15:35:16,058 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:35:42,641 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 15:35:44,144 [INFO] hardware.histogram_worker: Successfully stopped measurement 450b32ba-48b6-4b71-8067-ea145202356d
+2026-09-02 15:35:44,177 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:39:12,819 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 15:39:14,752 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 15:39:37,107 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:39:37,138 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:39:37,183 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/a23141b7-7fe5-45c5-91cd-f9775ffb6a54
+2026-09-02 15:39:37,211 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:39:40,046 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 15:40:10,331 [INFO] hardware.histogram_worker: Successfully stopped measurement a23141b7-7fe5-45c5-91cd-f9775ffb6a54
+2026-09-02 15:40:10,363 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:40:16,399 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:40:16,428 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:40:16,452 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/8d0812ff-db98-46cf-8fb1-b0bc3f61a5fd
+2026-09-02 15:40:16,467 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:40:16,607 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 15:40:25,929 [INFO] hardware.histogram_worker: Successfully stopped measurement 8d0812ff-db98-46cf-8fb1-b0bc3f61a5fd
+2026-09-02 15:40:25,976 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:40:33,102 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:40:33,158 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:40:33,168 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/da18af46-2697-4b79-920d-61dda973fc89
+2026-09-02 15:40:33,190 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:40:33,220 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 15:40:45,248 [INFO] hardware.histogram_worker: Successfully stopped measurement da18af46-2697-4b79-920d-61dda973fc89
+2026-09-02 15:40:45,282 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:40:52,978 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:40:53,006 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:40:53,036 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/78bd807e-89af-4457-864e-02c41bc84465
+2026-09-02 15:40:53,066 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:40:53,672 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 15:41:27,832 [INFO] hardware.histogram_worker: Successfully stopped measurement 78bd807e-89af-4457-864e-02c41bc84465
+2026-09-02 15:41:27,856 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:41:37,739 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:41:37,780 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:41:37,818 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/2f254b40-0ac7-44cc-a274-8f81a3e43018
+2026-09-02 15:41:37,840 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:41:38,267 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:41:54,318 [INFO] hardware.histogram_worker: Successfully stopped measurement 2f254b40-0ac7-44cc-a274-8f81a3e43018
+2026-09-02 15:41:54,367 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:42:02,644 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:42:02,697 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 15:42:02,709 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/a9e82bc2-2194-4c7e-9ae6-dfe0eb43ed67
+2026-09-02 15:42:02,718 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:42:02,762 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:42:28,525 [INFO] hardware.histogram_worker: Successfully stopped measurement a9e82bc2-2194-4c7e-9ae6-dfe0eb43ed67
+2026-09-02 15:42:28,554 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:42:30,595 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 15:49:15,021 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 15:49:24,312 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 15:49:35,758 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:49:35,792 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 15:49:35,825 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/2fd9339f-390a-402b-afb8-52a5fcfc9178
+2026-09-02 15:49:35,834 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:49:35,884 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (2,))
+2026-09-02 15:49:52,018 [INFO] hardware.histogram_worker: Successfully stopped measurement 2fd9339f-390a-402b-afb8-52a5fcfc9178
+2026-09-02 15:49:52,052 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:49:56,888 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:49:56,921 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:49:56,943 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/c7139a68-d940-4358-8ee1-fc25d05c6bce
+2026-09-02 15:49:56,962 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:49:56,992 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:50:09,897 [INFO] hardware.histogram_worker: Successfully stopped measurement c7139a68-d940-4358-8ee1-fc25d05c6bce
+2026-09-02 15:50:09,933 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:50:20,117 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:50:20,145 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:50:20,194 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/979a6638-dfc3-4746-9642-aa8757d6e492
+2026-09-02 15:50:20,199 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:50:20,369 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:50:45,406 [INFO] hardware.histogram_worker: Successfully stopped measurement 979a6638-dfc3-4746-9642-aa8757d6e492
+2026-09-02 15:50:45,437 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:50:49,651 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:50:49,689 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Histogram
+2026-09-02 15:50:49,711 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/8c4f2507-334b-4a47-a147-fb5a25b9b361
+2026-09-02 15:50:49,729 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:50:49,761 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:51:04,765 [INFO] hardware.histogram_worker: Successfully stopped measurement 8c4f2507-334b-4a47-a147-fb5a25b9b361
+2026-09-02 15:51:04,806 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:51:09,037 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:51:09,074 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 15:51:09,116 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/d44d6ea8-7def-48ff-b1dc-ea2227618757
+2026-09-02 15:51:09,140 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:51:09,736 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:51:37,787 [INFO] hardware.histogram_worker: Successfully stopped measurement d44d6ea8-7def-48ff-b1dc-ea2227618757
+2026-09-02 15:51:37,819 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 15:51:42,278 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 15:51:42,320 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 15:51:42,360 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/8bd3d240-3310-4bfa-98a8-e94553111b1a
+2026-09-02 15:51:42,382 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 15:51:42,417 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 15:52:47,314 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 15:52:47,338 [INFO] hardware.histogram_worker: Successfully stopped measurement 8bd3d240-3310-4bfa-98a8-e94553111b1a
+2026-09-02 15:52:47,371 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 16:08:41,969 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 16:08:50,534 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 16:09:17,980 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 16:09:18,015 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 16:09:18,066 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/77f93d10-3672-4939-b318-a6dd3079cdb4
+2026-09-02 16:09:18,095 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 16:09:18,126 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 16:10:00,883 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 16:10:00,973 [INFO] hardware.histogram_worker: Successfully stopped measurement 77f93d10-3672-4939-b318-a6dd3079cdb4
+2026-09-02 16:10:01,022 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 16:15:00,530 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 16:15:02,455 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 16:16:38,223 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 16:16:38,279 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 16:16:38,303 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/436982df-c367-4840-9160-cb7fc12c8283
+2026-09-02 16:16:38,312 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 16:16:38,351 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 16:19:58,149 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 16:19:58,200 [INFO] hardware.histogram_worker: Successfully stopped measurement 436982df-c367-4840-9160-cb7fc12c8283
+2026-09-02 16:19:58,234 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 16:20:01,022 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 16:20:07,565 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 16:20:14,205 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 16:20:14,239 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Start-Stop
+2026-09-02 16:20:14,261 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/478e62d0-5d95-45ee-93a9-8fed7687fe99
+2026-09-02 16:20:14,264 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 16:20:14,860 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (0,))
+2026-09-02 16:20:17,849 [INFO] hardware.histogram_worker: Successfully stopped measurement 478e62d0-5d95-45ee-93a9-8fed7687fe99
+2026-09-02 16:20:17,882 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-02 16:20:22,917 [INFO] hardware.histogram_worker: Attempting to book 2 channels via MaaS API: [2, 3]
+2026-09-02 16:20:22,966 [INFO] hardware.histogram_worker: Sending histogram measurement request to backend API. Mode: Correlation
+2026-09-02 16:20:22,978 [INFO] hardware.histogram_worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/9b94290c-a294-457e-922e-6e10726ce5c1
+2026-09-02 16:20:22,993 [INFO] hardware.histogram_worker: WebSocket connected successfully!
+2026-09-02 16:20:23,265 [INFO] hardware.histogram_worker: First data frame received from Redis stream via WebSocket (shape: (1000,))
+2026-09-02 16:20:59,822 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 16:20:59,871 [INFO] hardware.histogram_worker: Successfully stopped measurement 9b94290c-a294-457e-922e-6e10726ce5c1
+2026-09-02 16:20:59,904 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client

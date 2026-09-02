@@ -109,7 +109,7 @@ class CountRateWorker(QThread):
             resp = requests.post(f"{self.base_url}/measurements/count-rate-live", json=payload)
             resp.raise_for_status()
             data = resp.json()
-            self.measurement_id = data.get("measurement_id")
+            self.measurement_id = data.get("status_id", data.get("measurement_id"))
 
             if not self.measurement_id:
                 logger.error("No measurement_id returned by the API!")
