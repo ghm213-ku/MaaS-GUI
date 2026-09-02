@@ -553,3 +553,249 @@
 2026-08-24 15:23:52,967 [INFO] hardware.worker: Successfully stopped measurement ed9cf2f9-6595-49ce-b1ec-49da10cacc25
 2026-08-24 15:23:55,016 [INFO] hardware.worker: Successfully released channels for maas-gui-client
 2026-08-24 15:23:55,381 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-08-24 15:44:52,780 [INFO] __main__: Starting MaaS GUI Application
+2026-08-24 15:45:01,559 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-08-24 15:45:19,439 [INFO] ui.main_window: Channel 1 toggled to active
+2026-08-24 15:45:20,095 [INFO] ui.main_window: Channel 2 toggled to active
+2026-08-24 15:45:21,079 [INFO] ui.main_window: Channel 3 toggled to active
+2026-08-24 15:45:29,030 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-08-24 15:45:29,031 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-08-24 15:45:29,059 [INFO] ui.main_window: Measurement paused by user.
+2026-08-24 15:45:30,424 [INFO] ui.main_window: Resetting/stopping measurement by user.
+2026-08-24 15:45:31,073 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/c94721fd-4ae3-4e82-b515-0d1e3b01f88f
+2026-08-24 15:45:33,099 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-24 15:45:35,166 [INFO] hardware.worker: Successfully stopped measurement c94721fd-4ae3-4e82-b515-0d1e3b01f88f
+2026-08-24 15:45:37,218 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-24 15:45:42,220 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-08-24 15:45:42,221 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-08-24 15:45:42,221 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-08-24 15:45:44,251 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/e984e477-2ab8-4f19-96d1-c9c33b5dcebb
+2026-08-24 15:45:46,297 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-24 15:45:59,400 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-08-24 15:53:18,622 [INFO] __main__: Starting MaaS GUI Application
+2026-08-24 15:53:22,534 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-08-24 15:53:33,152 [INFO] ui.main_window: Channel 4 toggled to active
+2026-08-24 15:53:33,736 [INFO] ui.main_window: Channel 5 toggled to active
+2026-08-24 15:53:34,376 [INFO] ui.main_window: Channel 4 toggled to inactive
+2026-08-24 15:53:34,888 [INFO] ui.main_window: Channel 4 toggled to active
+2026-08-24 15:53:35,688 [INFO] ui.main_window: Channel 5 toggled to inactive
+2026-08-24 15:53:36,088 [INFO] ui.main_window: Channel 5 toggled to active
+2026-08-24 15:53:36,576 [INFO] ui.main_window: Channel 4 toggled to inactive
+2026-08-24 15:53:37,016 [INFO] ui.main_window: Channel 4 toggled to active
+2026-08-24 15:53:45,912 [INFO] ui.main_window: Channel 2 toggled to inactive
+2026-08-24 15:53:46,384 [INFO] ui.main_window: Channel 1 toggled to inactive
+2026-08-24 15:53:47,184 [INFO] ui.main_window: Channel 3 toggled to inactive
+2026-08-24 15:53:55,844 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [4, 5] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-08-24 15:53:55,846 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-08-24 15:53:55,865 [INFO] ui.main_window: Measurement paused by user.
+2026-08-24 15:53:56,321 [INFO] ui.main_window: Resetting/stopping measurement by user.
+2026-08-24 15:53:57,889 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/e0938c00-b42b-4885-bb6e-a255c07cb158
+2026-08-24 15:53:59,929 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-24 15:54:01,973 [INFO] hardware.worker: Successfully stopped measurement e0938c00-b42b-4885-bb6e-a255c07cb158
+2026-08-24 15:54:04,027 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-08-24 15:54:08,744 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [4, 5] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-08-24 15:54:08,745 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-08-24 15:54:08,745 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-08-24 15:54:10,785 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/e4af83dc-7437-4b93-972f-463bff590820
+2026-08-24 15:54:12,824 [INFO] hardware.worker: WebSocket connected successfully!
+2026-08-24 15:54:15,544 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 09:46:30,902 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 09:46:43,758 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='localhost', port=8000) at 0x26f7a5bbe00>, 'Connection to localhost timed out. (connect timeout=2)'))
+2026-09-02 09:47:19,384 [INFO] ui.main_window: Channel 1 toggled to active
+2026-09-02 09:47:20,384 [INFO] ui.main_window: Channel 2 toggled to active
+2026-09-02 09:47:21,193 [INFO] ui.main_window: Channel 3 toggled to active
+2026-09-02 09:47:54,849 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-09-02 09:47:54,851 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-09-02 09:47:56,897 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/a12d0b17-66bd-47f4-9e06-e95ad9955158
+2026-09-02 09:47:58,953 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 09:48:03,449 [INFO] ui.main_window: Measurement paused by user.
+2026-09-02 09:48:04,209 [INFO] ui.main_window: Resetting/stopping measurement by user.
+2026-09-02 09:48:06,282 [INFO] hardware.worker: Successfully stopped measurement a12d0b17-66bd-47f4-9e06-e95ad9955158
+2026-09-02 09:48:08,324 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 09:48:23,949 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=100000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 09:48:23,950 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 09:48:25,995 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/d3975a2f-857b-4c4a-a692-44ded99363ee
+2026-09-02 09:48:28,050 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 09:48:28,064 [INFO] hardware.worker: Received Single frame, shape: (3, 100), sum: 16000
+2026-09-02 09:48:28,113 [INFO] hardware.worker: Received Single frame, shape: (3, 100), sum: 16000
+2026-09-02 09:48:28,114 [INFO] hardware.worker: Single measurement duration (0.01s) complete. Stopping worker.
+2026-09-02 09:48:30,187 [INFO] hardware.worker: Successfully stopped measurement d3975a2f-857b-4c4a-a692-44ded99363ee
+2026-09-02 09:48:32,244 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 09:48:32,255 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 09:48:52,837 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=10000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 09:48:52,839 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 09:48:54,871 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/d5e882f7-0dd2-4a1f-9178-38b6047796fa
+2026-09-02 09:48:56,909 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 09:48:56,924 [INFO] hardware.worker: Received Single frame, shape: (3, 100), sum: 1600
+2026-09-02 09:48:56,925 [INFO] hardware.worker: Single measurement duration (0.001s) complete. Stopping worker.
+2026-09-02 09:48:58,961 [INFO] hardware.worker: Successfully stopped measurement d5e882f7-0dd2-4a1f-9178-38b6047796fa
+2026-09-02 09:49:00,994 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 09:49:01,002 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 09:49:18,942 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-09-02 09:49:18,943 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-09-02 09:49:20,998 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/ec47d25f-8558-4261-8473-81768b88fb36
+2026-09-02 09:49:23,024 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 09:51:28,873 [INFO] ui.main_window: Measurement paused by user.
+2026-09-02 09:51:29,985 [INFO] ui.main_window: Resetting/stopping measurement by user.
+2026-09-02 09:51:33,035 [INFO] hardware.worker: Successfully stopped measurement ec47d25f-8558-4261-8473-81768b88fb36
+2026-09-02 09:51:35,064 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 09:52:38,529 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 09:55:11,270 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 09:55:14,997 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 10:05:18,387 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 10:05:44,663 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 10:05:48,562 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 10:06:21,995 [INFO] hardware.worker: Attempting to book 3 channels via MaaS API: [1, 2, 3]
+2026-09-02 10:06:24,021 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-09-02 10:06:24,023 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-09-02 10:06:26,068 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/7bf4d05f-c73c-484c-8b6e-875221a9854e
+2026-09-02 10:06:28,121 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:06:30,280 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (3, 1000))
+2026-09-02 10:07:58,824 [INFO] hardware.worker: Successfully stopped measurement 7bf4d05f-c73c-484c-8b6e-875221a9854e
+2026-09-02 10:08:00,890 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:08:04,712 [INFO] hardware.worker: Attempting to book 3 channels via MaaS API: [1, 2, 3]
+2026-09-02 10:08:06,724 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-09-02 10:08:06,725 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:09:35,614 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 10:09:43,785 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 10:09:52,941 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-09-02 10:09:52,942 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-09-02 10:09:54,981 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/bfa7c3b0-9119-4968-86d4-e017815f6a27
+2026-09-02 10:09:57,037 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:09:59,104 [INFO] hardware.worker: Successfully stopped measurement bfa7c3b0-9119-4968-86d4-e017815f6a27
+2026-09-02 10:10:01,167 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:10:02,325 [INFO] hardware.worker: Attempting to book 3 channels via MaaS API: [1, 2, 3]
+2026-09-02 10:10:04,353 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-09-02 10:10:04,354 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-09-02 10:10:04,369 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:10:06,399 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/47f69b06-fff7-49b5-b999-3629bd3a02e9
+2026-09-02 10:10:08,451 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:10:11,449 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (3, 1))
+2026-09-02 10:10:12,536 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-09-02 10:10:12,537 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-09-02 10:10:14,606 [INFO] hardware.worker: Connecting to WebSocket: ws://localhost:8000/api/v1/measurements/stream/7d0e9088-3a58-4421-a269-649ed72e0d40
+2026-09-02 10:10:16,645 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:10:19,644 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (3, 1))
+2026-09-02 10:12:01,914 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 10:12:04,513 [INFO] hardware.worker: Successfully stopped measurement 7d0e9088-3a58-4421-a269-649ed72e0d40
+2026-09-02 10:12:06,563 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:12:06,600 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:39:10,049 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 10:39:16,493 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 10:39:39,705 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:39:39,728 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=1000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 10:39:39,729 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:39:39,758 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/6052dac2-3d42-40f1-a78d-ccd790499c4c
+2026-09-02 10:39:39,786 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:39:41,853 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 100))
+2026-09-02 10:39:41,853 [INFO] hardware.worker: Received Single frame, shape: (2, 100), sum: 80
+2026-09-02 10:39:41,853 [INFO] hardware.worker: Single measurement duration (0.0001s) complete. Stopping worker.
+2026-09-02 10:39:41,876 [INFO] hardware.worker: Successfully stopped measurement 6052dac2-3d42-40f1-a78d-ccd790499c4c
+2026-09-02 10:39:41,915 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:39:41,926 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:39:50,378 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:39:50,412 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-09-02 10:39:50,413 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-09-02 10:39:50,435 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/ff7131ca-afd7-4b2c-a706-a718195abcb8
+2026-09-02 10:39:50,454 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:39:52,627 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 1))
+2026-09-02 10:40:21,884 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-02 10:40:22,870 [INFO] hardware.worker: Successfully stopped measurement ff7131ca-afd7-4b2c-a706-a718195abcb8
+2026-09-02 10:40:22,886 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:40:22,894 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:52:04,471 [INFO] __main__: Starting MaaS GUI Application
+2026-09-02 10:52:09,914 [INFO] ui.main_window: Fetched channel status from backend. Found 48 channels.
+2026-09-02 10:52:24,921 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:52:24,941 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=1000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 10:52:24,943 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:52:24,989 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/ac7ae5a7-f691-4f89-a3de-e923ef90515a
+2026-09-02 10:52:24,993 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:52:27,053 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 100))
+2026-09-02 10:52:27,054 [INFO] hardware.worker: Received Single frame, shape: (2, 100), sum: 80
+2026-09-02 10:52:27,054 [INFO] hardware.worker: Single measurement duration (0.0001s) complete. Stopping worker.
+2026-09-02 10:52:27,096 [INFO] hardware.worker: Successfully stopped measurement ac7ae5a7-f691-4f89-a3de-e923ef90515a
+2026-09-02 10:52:27,125 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:52:27,125 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:52:37,100 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:52:37,128 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=1000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 10:52:37,129 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-09-02 10:52:37,156 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/977ff175-a19c-4712-8185-483766670446
+2026-09-02 10:52:37,160 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:52:39,194 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 100))
+2026-09-02 10:52:54,977 [INFO] hardware.worker: Successfully stopped measurement 977ff175-a19c-4712-8185-483766670446
+2026-09-02 10:52:55,012 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:52:59,955 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:52:59,989 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=1000000000000.0, n_values=1, duration=60m, refresh=25Hz
+2026-09-02 10:52:59,990 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Repeating
+2026-09-02 10:53:00,016 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/ebb3979c-800a-4a88-b583-d01d87118293
+2026-09-02 10:53:00,031 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:53:03,022 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 1))
+2026-09-02 10:53:23,206 [INFO] hardware.worker: Successfully stopped measurement ebb3979c-800a-4a88-b583-d01d87118293
+2026-09-02 10:53:23,241 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:53:33,319 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:53:33,341 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=10000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 10:53:33,342 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:53:33,369 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/3cfea14d-37e6-4048-97f4-70ff79b7a0f1
+2026-09-02 10:53:33,372 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:53:35,445 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 100))
+2026-09-02 10:53:35,446 [INFO] hardware.worker: Received Single frame, shape: (2, 100), sum: 800
+2026-09-02 10:53:35,446 [INFO] hardware.worker: Single measurement duration (0.001s) complete. Stopping worker.
+2026-09-02 10:53:35,485 [INFO] hardware.worker: Successfully stopped measurement 3cfea14d-37e6-4048-97f4-70ff79b7a0f1
+2026-09-02 10:53:35,518 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:53:35,519 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:53:38,415 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:53:38,446 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=1000000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 10:53:38,448 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:53:38,469 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/d8c280c9-540c-45e0-9716-31f7b0c11f96
+2026-09-02 10:53:38,474 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:53:40,514 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 100))
+2026-09-02 10:53:40,514 [INFO] hardware.worker: Received Single frame, shape: (2, 100), sum: 80
+2026-09-02 10:53:40,515 [INFO] hardware.worker: Single measurement duration (0.0001s) complete. Stopping worker.
+2026-09-02 10:53:40,577 [INFO] hardware.worker: Successfully stopped measurement d8c280c9-540c-45e0-9716-31f7b0c11f96
+2026-09-02 10:53:40,601 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:53:40,602 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:53:43,754 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:53:43,779 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=100000.0, n_values=100, duration=60m, refresh=25Hz
+2026-09-02 10:53:43,780 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:53:43,799 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/2fda49dc-0af0-4885-9719-9248045cb3d9
+2026-09-02 10:53:43,819 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:53:45,863 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 100))
+2026-09-02 10:53:45,864 [INFO] hardware.worker: Received Single frame, shape: (2, 100), sum: 8
+2026-09-02 10:53:45,865 [INFO] hardware.worker: Single measurement duration (1e-05s) complete. Stopping worker.
+2026-09-02 10:53:45,905 [INFO] hardware.worker: Successfully stopped measurement 2fda49dc-0af0-4885-9719-9248045cb3d9
+2026-09-02 10:53:45,938 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:53:45,939 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:53:48,760 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:53:48,788 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=100000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-09-02 10:53:48,790 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:53:48,836 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/638fd141-a57b-4640-aeac-c8aa4b211bd9
+2026-09-02 10:53:48,855 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:53:50,900 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 1000))
+2026-09-02 10:53:50,900 [INFO] hardware.worker: Received Single frame, shape: (2, 1000), sum: 80
+2026-09-02 10:53:50,900 [INFO] hardware.worker: Single measurement duration (0.0001s) complete. Stopping worker.
+2026-09-02 10:53:50,923 [INFO] hardware.worker: Successfully stopped measurement 638fd141-a57b-4640-aeac-c8aa4b211bd9
+2026-09-02 10:53:50,937 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:53:50,937 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:53:53,970 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:53:53,992 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=10000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-09-02 10:53:53,993 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:53:54,023 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/ce6948ff-0219-4d97-a683-f89a9e4260e6
+2026-09-02 10:53:54,050 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:53:56,120 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 1000))
+2026-09-02 10:53:56,122 [INFO] hardware.worker: Received Single frame, shape: (2, 1000), sum: 8
+2026-09-02 10:53:56,131 [INFO] hardware.worker: Single measurement duration (1e-05s) complete. Stopping worker.
+2026-09-02 10:53:56,149 [INFO] hardware.worker: Successfully stopped measurement ce6948ff-0219-4d97-a683-f89a9e4260e6
+2026-09-02 10:53:56,192 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:53:56,207 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:54:12,584 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-09-02 10:54:12,613 [INFO] ui.main_window: Measurement started successfully for user maas-gui-client on channels [1, 2] with binwidth=10000.0, n_values=10000, duration=60m, refresh=25Hz
+2026-09-02 10:54:12,614 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Single
+2026-09-02 10:54:12,639 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/3f3dfd78-636f-40e2-9f8c-98f1aa380f83
+2026-09-02 10:54:12,667 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-02 10:54:14,753 [INFO] hardware.worker: First data frame received from Redis stream via WebSocket (shape: (2, 10000))
+2026-09-02 10:54:14,754 [INFO] hardware.worker: Received Single frame, shape: (2, 10000), sum: 80
+2026-09-02 10:54:14,754 [INFO] hardware.worker: Single measurement duration (0.0001s) complete. Stopping worker.
+2026-09-02 10:54:14,778 [INFO] hardware.worker: Successfully stopped measurement 3f3dfd78-636f-40e2-9f8c-98f1aa380f83
+2026-09-02 10:54:14,816 [INFO] hardware.worker: Successfully released channels for maas-gui-client
+2026-09-02 10:54:14,817 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-02 10:54:23,109 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...

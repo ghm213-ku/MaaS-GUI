@@ -23,8 +23,8 @@ class CountRateWorker(QThread):
         self.duration_minutes = duration_minutes
         self.refresh_rate = refresh_rate
         self.mode = mode
-        self.base_url = "http://localhost:8000/api/v1"
-        self.ws_base_url = "ws://localhost:8000/api/v1"
+        self.base_url = "http://127.0.0.1:8000/api/v1"
+        self.ws_base_url = "ws://127.0.0.1:8000/api/v1"
         self.measurement_id = None
         self.ws = None
         self.is_paused = False
@@ -48,11 +48,13 @@ class CountRateWorker(QThread):
                         channels_to_book.append(ch)
                         
                 if conflict_users:
+                    logger.warning(f"MaaS API channel booking conflict: channels already used by {conflict_users}")
                     self.booking_error = f"Channels are already booked by: {', '.join(conflict_users)}"
                     break
                     
                 # 2. Book ONLY the channels that are currently available
                 if channels_to_book:
+                    logger.info(f"Attempting to book {len(channels_to_book)} channels via MaaS API: {channels_to_book}")
                     resp = requests.post(f"{self.base_url}/channels/book", json={
                         "user_name": self.user_name,
                         "channel_numbers": channels_to_book
@@ -147,6 +149,7 @@ class CountRateWorker(QThread):
                                 
                             if start_time is None:
                                 start_time = time.time()
+                                logger.info(f"First data frame received from Redis stream via WebSocket (shape: {rates_arr.shape})")
                                 
                             if rates_arr.shape[0] == len(self.channels):
                                 if self.mode == "Single":
@@ -190,8 +193,8 @@ class CountRateWorker(QThread):
         if self.measurement_id:
             for attempt in range(2):
                 try:
-                    # Increased timeout to 5 seconds to avoid ReadTimeout on busy backend
-                    requests.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=5)
+                    # Swabian hardware takes ~5.5s to teardown on the backend!
+                    requests.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
                     logger.info(f"Successfully stopped measurement {self.measurement_id}")
                     break
                 except Exception as e:
@@ -200,7 +203,7 @@ class CountRateWorker(QThread):
         # Release channels
         for attempt in range(2):
             try:
-                requests.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=5)
+                requests.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=10)
                 logger.info(f"Successfully released channels for {self.user_name}")
                 break
             except Exception as e:

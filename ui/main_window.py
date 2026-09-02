@@ -91,7 +91,6 @@ class ChannelNodeWidget(QFrame):
         popup.move(QCursor.pos())
         if popup.exec() == QDialog.DialogCode.Accepted:
             t, d = popup.get_values()
-            logger.info(f"Updated Channel {self.channel_id} settings: Trigger={t}V, Delay={d}ps")
             self.trigger_val = t
             self.delay_val = d
             self.lbl_trig.setText(f"{t}V")
@@ -159,7 +158,6 @@ class ChannelNodeWidget(QFrame):
 
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_active = not self.is_active
-            logger.info(f"Channel {self.channel_id} toggled to {'active' if self.is_active else 'inactive'}")
             self.update_style()
             self.toggled.emit(self.channel_id, self.is_active)
         elif event.button() == Qt.MouseButton.RightButton:
@@ -224,6 +222,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Swabian Count Rate Monitor")
         self.resize(1000, 700)
         self.worker = None
+        self.old_workers = []
         
         self.setStyleSheet("""
             QMainWindow, QDialog {
@@ -360,7 +359,7 @@ class MainWindow(QMainWindow):
 
     def fetch_booked_channels(self):
         try:
-            resp = requests.get("http://localhost:8000/api/v1/channels", timeout=2)
+            resp = requests.get("http://127.0.0.1:8000/api/v1/channels", timeout=2)
             if resp.status_code == 200:
                 channels_info = resp.json().get("channels", [])
                 logger.info(f"Fetched channel status from backend. Found {len(channels_info)} channels.")
@@ -439,8 +438,10 @@ class MainWindow(QMainWindow):
         controls.addSpacing(10)
         controls.addWidget(QLabel("Bin_width (ps):"))
         controls.addWidget(self.binwidth_input)
+        self.binwidth_input.returnPressed.connect(self.quick_restart)
         controls.addWidget(QLabel("Bins:"))
         controls.addWidget(self.n_values_input)
+        self.n_values_input.returnPressed.connect(self.quick_restart)
         controls.addStretch()
         layout.addLayout(controls)
         
@@ -548,7 +549,7 @@ class MainWindow(QMainWindow):
     def start_measurement(self):
         # Verify Backend Health
         try:
-            health_resp = requests.get("http://localhost:8000/health", timeout=2)
+            health_resp = requests.get("http://127.0.0.1:8000/health", timeout=2)
             if health_resp.status_code != 200 or health_resp.json().get("status") != "healthy":
                 QMessageBox.critical(self, "Backend Error", f"MaaS backend is not healthy.\nStatus Code: {health_resp.status_code}")
                 return
@@ -568,8 +569,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Invalid Input", "Please enter valid numbers for Binwidth and n_values.")
             return
 
-        # Initialize plot curves only if they don't exist (i.e. not resuming from pause)
-        if not self.plot_curves:
+        # Initialize plot curves only if we are starting a completely new measurement
+        if self.worker is None:
             self.plot_widget.clear()
             
             # Re-add persistent items after clearing
@@ -670,6 +671,7 @@ class MainWindow(QMainWindow):
                     self.plot_widget.setLabel('left', f'Counts / {binwidth}ps')
             
             self.worker = CountRateWorker(channels, user_name, binwidth, n_values, duration_minutes, refresh_rate, mode=mode)
+            self.worker.finished.connect(self.on_worker_finished)
             
             if self.worker.booking_error:
                 QMessageBox.critical(self, "Booking Failed", self.worker.booking_error)
@@ -686,10 +688,45 @@ class MainWindow(QMainWindow):
         self.btn_start.setEnabled(False)
         self.btn_pause.setEnabled(True)
         self.btn_reset.setEnabled(False)
-        self.binwidth_input.setEnabled(False)
-        self.n_values_input.setEnabled(False)
+        
+        mode = self.mode_combo.currentText()
+        if mode != "Single":
+            self.binwidth_input.setEnabled(False)
+            if mode != "Repeating":
+                self.n_values_input.setEnabled(False)
+                
         self.mode_combo.setEnabled(False)
         self.tabs.setTabEnabled(0, False) # Disable setup tab while running or paused
+
+    def quick_restart(self):
+        # Only allow quick restart while running if it's Single mode
+        if self.worker is not None and self.mode_combo.currentText() != "Single":
+            return
+            
+        if self.worker:
+            self.worker.stop()
+            self.old_workers.append(self.worker)
+            self.worker = None
+            
+        self.start_measurement()
+
+    def on_worker_finished(self):
+        # Restore UI when Single measurement completes naturally
+        if self.worker is None:
+            return
+            
+        logger.info("Worker thread finished naturally. Restoring UI state.")
+        self.btn_start.setEnabled(True)
+        self.btn_pause.setEnabled(False)
+        self.btn_reset.setEnabled(False)
+        
+        mode = self.mode_combo.currentText()
+        if mode != "Repeating":
+            self.binwidth_input.setEnabled(True)
+            self.n_values_input.setEnabled(True)
+        self.mode_combo.setEnabled(True)
+        self.tabs.setTabEnabled(0, True)
+        self.worker = None
 
     def update_plot(self, rates_2d):
         mode = self.mode_combo.currentText()
@@ -722,7 +759,6 @@ class MainWindow(QMainWindow):
     def pause_measurement(self):
         if self.worker:
             self.worker.is_paused = True
-            logger.info("Measurement paused by user.")
             
         self.btn_start.setEnabled(True)
         self.btn_pause.setEnabled(False)
@@ -730,8 +766,8 @@ class MainWindow(QMainWindow):
 
     def reset_measurement(self):
         if self.worker:
-            logger.info("Resetting/stopping measurement by user.")
             self.worker.stop()
+            self.old_workers.append(self.worker)
             self.worker = None
             
         self.plot_widget.clear()
@@ -794,9 +830,15 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         logger.info("Application is closing. Tearing down hardware and measurements...")
+        
+        if hasattr(self, 'old_workers'):
+            for old_worker in self.old_workers:
+                if old_worker.isRunning():
+                    old_worker.wait(15000)
+                    
         # Ensure hardware is freed if the user closes the window while running
         if self.worker:
-            self.worker.force_teardown()
-            # Wait for the background thread to exit cleanly
-            self.worker.wait(1000) 
+            self.worker.stop()
+            # Wait for the background thread to timeout (max 2s) and exit cleanly (max 15s)
+            self.worker.wait(15000) 
         event.accept()
