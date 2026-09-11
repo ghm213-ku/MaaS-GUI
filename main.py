@@ -1,7 +1,18 @@
 import sys
 import logging
+import os
+from pathlib import Path
+
+import PyQt6
+
+# Anaconda can expose Qt 5 plugins ahead of PyQt6's bundled Qt 6 plugins.
+os.environ.setdefault(
+    "QT_PLUGIN_PATH",
+    str(Path(PyQt6.__file__).resolve().parent / "Qt6" / "plugins"),
+)
+
 from PyQt6.QtWidgets import QApplication, QSplashScreen
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QPen
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QPen, QPalette
 from PyQt6.QtCore import Qt
 
 if __name__ == '__main__':
@@ -18,6 +29,22 @@ if __name__ == '__main__':
     logger.info("Starting MaaS GUI Application")
     
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+
+    light_palette = QPalette()
+    light_palette.setColor(QPalette.ColorRole.Window, QColor("#ffffff"))
+    light_palette.setColor(QPalette.ColorRole.WindowText, QColor("#111111"))
+    light_palette.setColor(QPalette.ColorRole.Base, QColor("#ffffff"))
+    light_palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#f7f7f7"))
+    light_palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#ffffff"))
+    light_palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#111111"))
+    light_palette.setColor(QPalette.ColorRole.Text, QColor("#111111"))
+    light_palette.setColor(QPalette.ColorRole.Button, QColor("#fbfbfb"))
+    light_palette.setColor(QPalette.ColorRole.ButtonText, QColor("#333333"))
+    light_palette.setColor(QPalette.ColorRole.BrightText, QColor("#ffffff"))
+    light_palette.setColor(QPalette.ColorRole.Highlight, QColor("#dbeafe"))
+    light_palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#111111"))
+    app.setPalette(light_palette)
     
     # Create a modern looking splash screen pixmap
     pixmap = QPixmap(500, 300)

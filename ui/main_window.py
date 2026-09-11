@@ -100,13 +100,23 @@ class ChannelNodeWidget(QFrame):
     def set_booked_by(self, user_name, is_current_user):
         self.booked_by = user_name
         self.is_current_user = is_current_user
-        if is_current_user:
-            self.is_active = True
-        else:
+        
+        if not user_name:
             self.is_active = False
-            self.lbl_trig.hide()
-            self.lbl_dly.hide()
-        self.setToolTip(f"Booked by: {user_name}")
+            self.lbl_trig.show()
+            self.lbl_dly.show()
+            self.setToolTip("")
+        else:
+            if is_current_user:
+                self.is_active = True
+                self.lbl_trig.show()
+                self.lbl_dly.show()
+            else:
+                self.is_active = False
+                self.lbl_trig.hide()
+                self.lbl_dly.hide()
+            self.setToolTip(f"Booked by: {user_name}")
+            
         self.update_style()
 
     def resizeEvent(self, event):
@@ -331,12 +341,14 @@ class MainWindow(QMainWindow):
         user_layout.addWidget(self.user_name_input)
         
         user_layout.addSpacing(20)
-        user_layout.addWidget(QLabel("Duration (mins):"))
-        self.duration_input = QLineEdit("60")
-        self.duration_input.setFixedWidth(60)
-        self.duration_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
-        self.duration_input.setValidator(QIntValidator(1, 10000))
-        user_layout.addWidget(self.duration_input)
+        self.btn_book = QPushButton("Book")
+        self.btn_book.clicked.connect(self.book_channels)
+        user_layout.addWidget(self.btn_book)
+        
+        user_layout.addSpacing(10)
+        self.btn_release = QPushButton("Release")
+        self.btn_release.clicked.connect(self.release_channels)
+        user_layout.addWidget(self.btn_release)
         
         user_layout.addStretch()
         layout.addLayout(user_layout)
@@ -392,6 +404,10 @@ class MainWindow(QMainWindow):
         try:
             resp = requests.get("http://127.0.0.1:8000/api/v1/channels", timeout=2)
             if resp.status_code == 200:
+                # Clear all first
+                for container in self.channel_nodes.values():
+                    container.set_booked_by(None, False)
+                
                 channels_info = resp.json().get("channels", [])
                 logger.info(f"Fetched channel status from backend. Found {len(channels_info)} channels.")
                 current_user = self.user_name_input.text().strip()
@@ -405,6 +421,72 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Failed to fetch booked channels: {e}")
 
+    def book_channels(self):
+        user_name = self.user_name_input.text().strip()
+        if not user_name:
+            QMessageBox.warning(self, "Invalid Input", "User Name cannot be empty.")
+            return
+            
+        channels = self.get_selected_channels()
+        if not channels:
+            QMessageBox.warning(self, "No Channels", "Please select at least one channel to book.")
+            return
+            
+        try:
+            payload = {
+                "user_name": user_name,
+                "channel_numbers": channels
+            }
+            resp = requests.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
+            if resp.status_code == 201:
+                logger.info(f"Booked channels: {channels}")
+            else:
+                QMessageBox.warning(self, "Booking Failed", f"Could not book channels: {resp.text}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to connect to backend: {e}")
+            
+        self.fetch_booked_channels()
+
+    def release_channels(self):
+        user_name = self.user_name_input.text().strip()
+        if not user_name:
+            return
+            
+        user_channels = []
+        selected_channels = []
+        for ch, container in self.channel_nodes.items():
+            if container.node.is_current_user:
+                user_channels.append(ch)
+                if container.node.is_active:
+                    selected_channels.append(ch)
+                    
+        if not selected_channels:
+            QMessageBox.warning(self, "No Channels", "Please select at least one of your booked channels to release.")
+            return
+            
+        to_keep = [ch for ch in user_channels if ch not in selected_channels]
+        
+        try:
+            # Release all for user
+            resp = requests.post(f"http://127.0.0.1:8000/api/v1/channels/release/{user_name}", timeout=2)
+            if resp.status_code == 200:
+                logger.info(f"Released all channels for {user_name}")
+                # Re-book the ones they want to keep
+                if to_keep:
+                    payload = {
+                        "user_name": user_name,
+                        "channel_numbers": to_keep
+                    }
+                    book_resp = requests.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
+                    if book_resp.status_code != 201:
+                        QMessageBox.warning(self, "Re-booking Failed", f"Released channels, but failed to re-book kept channels: {book_resp.text}")
+            else:
+                QMessageBox.warning(self, "Release Failed", f"Could not release channels: {resp.text}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to connect to backend: {e}")
+            
+        self.fetch_booked_channels()
+
     def build_counter_tab(self):
         self.counter_tab = QWidget()
         layout = QVBoxLayout(self.counter_tab)
@@ -412,16 +494,10 @@ class MainWindow(QMainWindow):
         # Controls
         controls = QHBoxLayout()
         
-        self.btn_start = QPushButton()
-        self.btn_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-        self.btn_start.setToolTip("Start")
-        self.btn_start.clicked.connect(self.start_measurement)
-        
-        self.btn_pause = QPushButton()
-        self.btn_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
-        self.btn_pause.setToolTip("Pause")
-        self.btn_pause.setEnabled(False)
-        self.btn_pause.clicked.connect(self.pause_measurement)
+        self.btn_play_pause = QPushButton()
+        self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.btn_play_pause.setToolTip("Start")
+        self.btn_play_pause.clicked.connect(self.toggle_play_pause)
 
         self.btn_reset = QPushButton()
         self.btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
@@ -455,8 +531,7 @@ class MainWindow(QMainWindow):
         self.mode_combo.addItems(["Free Running", "Single", "Repeating"])
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         
-        controls.addWidget(self.btn_start)
-        controls.addWidget(self.btn_pause)
+        controls.addWidget(self.btn_play_pause)
         controls.addWidget(self.btn_reset)
         controls.addWidget(self.btn_zoom)
         controls.addWidget(self.btn_auto_range)
@@ -532,16 +607,10 @@ class MainWindow(QMainWindow):
         # Controls
         controls = QHBoxLayout()
         
-        self.hist_btn_start = QPushButton()
-        self.hist_btn_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-        self.hist_btn_start.setToolTip("Start")
-        self.hist_btn_start.clicked.connect(self.start_histogram_measurement)
-        
-        self.hist_btn_pause = QPushButton()
-        self.hist_btn_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
-        self.hist_btn_pause.setToolTip("Pause")
-        self.hist_btn_pause.setEnabled(False)
-        self.hist_btn_pause.clicked.connect(self.pause_histogram_measurement)
+        self.hist_btn_play_pause = QPushButton()
+        self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist_btn_play_pause.setToolTip("Start")
+        self.hist_btn_play_pause.clicked.connect(self.hist_toggle_play_pause)
 
         self.hist_btn_reset = QPushButton()
         self.hist_btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
@@ -581,8 +650,7 @@ class MainWindow(QMainWindow):
         self.hist_btn_auto_range.setToolTip("Enable Auto Range")
         self.hist_btn_auto_range.clicked.connect(self.hist_force_auto_range)
 
-        controls.addWidget(self.hist_btn_start)
-        controls.addWidget(self.hist_btn_pause)
+        controls.addWidget(self.hist_btn_play_pause)
         controls.addWidget(self.hist_btn_reset)
         controls.addWidget(self.hist_btn_zoom)
         controls.addWidget(self.hist_btn_auto_range)
@@ -843,8 +911,12 @@ class MainWindow(QMainWindow):
             self.worker.is_paused = False
             logger.info("Measurement resumed from pause.")
         
-        self.btn_start.setEnabled(False)
-        self.btn_pause.setEnabled(True)
+        if self.mode_combo.currentText() == "Single":
+            self.btn_play_pause.setEnabled(False)
+        else:
+            self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+            self.btn_play_pause.setToolTip("Pause")
+            self.btn_play_pause.setEnabled(True)
         self.btn_reset.setEnabled(False)
         
         mode = self.mode_combo.currentText()
@@ -874,8 +946,9 @@ class MainWindow(QMainWindow):
             return
             
         logger.info("Worker thread finished naturally. Restoring UI state.")
-        self.btn_start.setEnabled(True)
-        self.btn_pause.setEnabled(False)
+        self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.btn_play_pause.setToolTip("Start")
+        self.btn_play_pause.setEnabled(True)
         self.btn_reset.setEnabled(False)
         
         mode = self.mode_combo.currentText()
@@ -914,13 +987,22 @@ class MainWindow(QMainWindow):
                     
         self.btn_export.setEnabled(True)
 
-    def pause_measurement(self):
-        if self.worker:
-            self.worker.is_paused = True
-            
-        self.btn_start.setEnabled(True)
-        self.btn_pause.setEnabled(False)
-        self.btn_reset.setEnabled(True)
+    def toggle_play_pause(self):
+        if self.worker is None:
+            self.start_measurement()
+        else:
+            if self.mode_combo.currentText() == "Single":
+                return
+                
+            self.worker.is_paused = not self.worker.is_paused
+            if self.worker.is_paused:
+                self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+                self.btn_play_pause.setToolTip("Resume")
+                self.btn_reset.setEnabled(True)
+            else:
+                self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+                self.btn_play_pause.setToolTip("Pause")
+                self.btn_reset.setEnabled(False)
 
     def reset_measurement(self):
         if self.worker:
@@ -945,8 +1027,9 @@ class MainWindow(QMainWindow):
         self.plot_widget.addItem(self.v_line, ignoreBounds=True)
         self.plot_widget.addItem(self.tooltip_label, ignoreBounds=True)
         
-        self.btn_start.setEnabled(True)
-        self.btn_pause.setEnabled(False)
+        self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.btn_play_pause.setToolTip("Start")
+        self.btn_play_pause.setEnabled(True)
         self.btn_reset.setEnabled(False)
         self.btn_export.setEnabled(False)
         
@@ -1002,8 +1085,9 @@ class MainWindow(QMainWindow):
         self.hist_worker.finished.connect(self.on_histogram_worker_finished)
         self.hist_worker.start()
 
-        self.hist_btn_start.setEnabled(False)
-        self.hist_btn_pause.setEnabled(True)
+        self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+        self.hist_btn_play_pause.setToolTip("Pause")
+        self.hist_btn_play_pause.setEnabled(True)
         self.hist_btn_reset.setEnabled(True)
         self.hist_btn_export.setEnabled(False)
         
@@ -1036,16 +1120,18 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 logger.error(f"Error plotting histogram: {e}")
 
-    def pause_histogram_measurement(self):
-        if self.hist_worker:
+    def hist_toggle_play_pause(self):
+        if self.hist_worker is None:
+            self.start_histogram_measurement()
+        else:
             self.hist_worker.is_paused = not self.hist_worker.is_paused
             if self.hist_worker.is_paused:
-                self.hist_btn_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-                self.hist_btn_pause.setToolTip("Resume")
+                self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+                self.hist_btn_play_pause.setToolTip("Resume")
                 self.hist_btn_export.setEnabled(True)
             else:
-                self.hist_btn_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
-                self.hist_btn_pause.setToolTip("Pause")
+                self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+                self.hist_btn_play_pause.setToolTip("Pause")
                 self.hist_btn_export.setEnabled(False)
 
     def hist_toggle_zoom(self, checked):
@@ -1084,8 +1170,9 @@ class MainWindow(QMainWindow):
         self.hist_data_buffer = None
         self.hist_x_buffer = None
         
-        self.hist_btn_start.setEnabled(True)
-        self.hist_btn_pause.setEnabled(False)
+        self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist_btn_play_pause.setToolTip("Start")
+        self.hist_btn_play_pause.setEnabled(True)
         self.hist_btn_reset.setEnabled(False)
         self.hist_btn_export.setEnabled(False)
         
@@ -1099,8 +1186,9 @@ class MainWindow(QMainWindow):
         self.tabs.setTabEnabled(1, True)
 
     def on_histogram_worker_finished(self):
-        self.hist_btn_start.setEnabled(True)
-        self.hist_btn_pause.setEnabled(False)
+        self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist_btn_play_pause.setToolTip("Start")
+        self.hist_btn_play_pause.setEnabled(True)
         self.hist_btn_reset.setEnabled(True)
         self.hist_btn_export.setEnabled(True)
         

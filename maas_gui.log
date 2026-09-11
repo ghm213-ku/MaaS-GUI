@@ -1109,3 +1109,25 @@
 2026-09-02 16:20:59,822 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
 2026-09-02 16:20:59,871 [INFO] hardware.histogram_worker: Successfully stopped measurement 9b94290c-a294-457e-922e-6e10726ce5c1
 2026-09-02 16:20:59,904 [INFO] hardware.histogram_worker: Successfully released channels for maas-gui-client
+2026-09-11 10:41:44,337 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:41:51,444 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:42:31,278 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:45:02,711 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:45:20,405 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:45:23,714 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 10:47:44,217 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:47:46,030 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-11 10:47:46,099 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 10:47:54,180 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 10:47:55,987 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 10:48:14,014 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-11 11:11:58,036 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 11:11:59,948 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 11:36:58,817 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-11 12:05:35,538 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 12:05:37,520 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 12:05:45,064 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 12:05:53,921 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-11 12:45:11,510 [INFO] __main__: Starting MaaS GUI Application
+2026-09-11 12:45:13,505 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
+2026-09-11 12:45:41,172 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
