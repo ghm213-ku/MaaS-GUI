@@ -30,6 +30,7 @@ class HistogramWorker(QThread):
         self.ws = None
         self.is_paused = False
         self.booking_error = None
+        self.is_mock = False
         
         # Book channels with a slight retry in case an old worker is still tearing down
         for attempt in range(5):
@@ -66,6 +67,10 @@ class HistogramWorker(QThread):
                 # If we got here, all requested channels are booked by us
                 break
                 
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Backend unavailable ({e}). Enabling mock mode for HistogramWorker.")
+                self.is_mock = True
+                break
             except Exception as e:
                 if attempt == 4:
                     logger.error(f"Failed to book channels: {e}")
@@ -75,6 +80,10 @@ class HistogramWorker(QThread):
                     time.sleep(0.2)
 
     def run(self):
+        if getattr(self, 'is_mock', False):
+            self._run_mock()
+            return
+            
         try:
             # 1. Start the measurement
             # mode string mapping (e.g. "Start-Stop" -> "start-stop-live")
@@ -167,10 +176,36 @@ class HistogramWorker(QThread):
         finally:
             self._perform_teardown()
 
+    def _run_mock(self):
+        import time
+        logger.info(f"Running mock HistogramWorker in mode: {self.mode}")
+        refresh_interval = 1.0 / 25.0
+        
+        while self.running:
+            if not self.is_paused:
+                index_arr = np.arange(self.n_values) * self.binwidth
+                
+                center = self.n_values // 2
+                x = np.arange(self.n_values)
+                
+                if self.mode == "Correlation":
+                    sigma = max(1, self.n_values / 10)
+                    rates_arr = 1000 * np.exp(-0.5 * ((x - center) / sigma) ** 2) + np.random.poisson(lam=10, size=self.n_values)
+                else:
+                    sigma = max(1, self.n_values / 20)
+                    rates_arr = 500 * np.exp(-0.5 * ((x - center/2) / sigma) ** 2) + np.random.poisson(lam=5, size=self.n_values)
+                
+                self.newDataReady.emit(index_arr, rates_arr)
+                
+            time.sleep(refresh_interval)
+
     def _perform_teardown(self):
         if getattr(self, '_teardown_done', False):
             return
         self._teardown_done = True
+        
+        if getattr(self, 'is_mock', False):
+            return
 
         # Close WebSocket
         if self.ws:

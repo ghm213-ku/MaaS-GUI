@@ -29,6 +29,7 @@ class CountRateWorker(QThread):
         self.ws = None
         self.is_paused = False
         self.booking_error = None
+        self.is_mock = False
 
         # Book channels with a slight retry in case an old worker is still tearing down
         for attempt in range(5):
@@ -64,6 +65,10 @@ class CountRateWorker(QThread):
                 # If we got here, all requested channels are booked by us
                 break
                 
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Backend unavailable ({e}). Enabling mock mode for CountRateWorker.")
+                self.is_mock = True
+                break
             except Exception as e:
                 if attempt == 4:
                     logger.error(f"Failed to book channels: {e}")
@@ -73,6 +78,10 @@ class CountRateWorker(QThread):
                     time.sleep(0.2)
 
     def run(self):
+        if getattr(self, 'is_mock', False):
+            self._run_mock()
+            return
+            
         try:
             # 1. Start the measurement
             # Configure payload based on mode
@@ -177,10 +186,48 @@ class CountRateWorker(QThread):
         finally:
             self._perform_teardown()
 
+    def _run_mock(self):
+        import time
+        logger.info(f"Running mock CountRateWorker in mode: {self.mode}")
+        start_time = time.time()
+        
+        if self.mode == "Repeating":
+            refresh_interval = 1.0 / max(1, min(100, 1e12 / self.binwidth))
+            exact_duration_sec = None
+        elif self.mode == "Single":
+            refresh_interval = 1.0 / self.refresh_rate
+            exact_duration_sec = (self.n_values * self.binwidth) / 1e12
+        else:
+            refresh_interval = 1.0 / self.refresh_rate
+            exact_duration_sec = None
+            
+        while self.running:
+            if not self.is_paused:
+                if self.mode == "Repeating":
+                    shape = (len(self.channels), 1)
+                else:
+                    shape = (len(self.channels), self.n_values)
+                    
+                # Generate mock data
+                mock_data = np.random.normal(loc=800, scale=100, size=shape)
+                mock_data = np.clip(mock_data, 0, None)
+                
+                self.newDataReady.emit(mock_data)
+                
+                if exact_duration_sec and (time.time() - start_time) >= exact_duration_sec:
+                    logger.info("Single measurement duration complete. Stopping mock worker.")
+                    self.running = False
+                    break
+                    
+            time.sleep(refresh_interval)
+
     def _perform_teardown(self):
         if getattr(self, '_teardown_done', False):
             return
         self._teardown_done = True
+        
+        if getattr(self, 'is_mock', False):
+            return
 
         # Close WebSocket
         if self.ws:
