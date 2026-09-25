@@ -260,77 +260,47 @@ class MainWindow(QMainWindow):
         
         self.setStyleSheet("""
             QMainWindow, QDialog {
-                background-color: #f8fafc;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                color: #0f172a;
+                background-color: #ffffff;
+                font-family: 'Segoe UI', Arial, sans-serif;
             }
             QTabWidget::pane {
-                border: 1px solid #e2e8f0;
+                border: none;
+                border-top: 1px solid #eaeaea;
                 background: #ffffff;
-                border-radius: 8px;
             }
             QTabBar::tab {
-                background: transparent;
-                color: #64748b;
-                padding: 10px 24px;
+                background: #ffffff;
+                color: #888888;
+                padding: 10px 20px;
                 border: none;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 500;
-                margin-right: 2px;
             }
             QTabBar::tab:hover {
-                color: #334155;
+                color: #333333;
             }
             QTabBar::tab:selected {
-                color: #0f172a;
-                border-bottom: 2px solid #2563eb;
+                color: #111111;
+                border-bottom: 2px solid #111111;
             }
             QPushButton {
-                background-color: #ffffff;
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 8px 16px;
-                color: #0f172a;
+                background-color: #fbfbfb;
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: #333333;
                 font-size: 13px;
-                font-weight: 500;
             }
             QPushButton:hover {
-                background-color: #f1f5f9;
-                border-color: #94a3b8;
+                background-color: #f0f0f0;
             }
             QPushButton:pressed, QPushButton:checked {
-                background-color: #e2e8f0;
-                border-color: #64748b;
-            }
-            QPushButton#primaryButton {
-                background-color: #2563eb;
-                color: white;
-                border: none;
-            }
-            QPushButton#primaryButton:hover {
-                background-color: #1d4ed8;
-            }
-            QPushButton#primaryButton:disabled {
-                background-color: #93c5fd;
-            }
-            QLineEdit, QComboBox {
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 6px 10px;
-                background: #ffffff;
-                color: #0f172a;
-                font-size: 13px;
-            }
-            QLineEdit:focus, QComboBox:focus {
-                border: 1px solid #3b82f6;
+                background-color: #e8e8e8;
+                border-color: #d0d0d0;
             }
             QScrollArea {
                 border: none;
                 background-color: transparent;
-            }
-            QLabel {
-                color: #334155;
-                font-weight: 500;
             }
         """)
         
@@ -528,22 +498,30 @@ class MainWindow(QMainWindow):
         self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.btn_play_pause.setToolTip("Start")
         self.btn_play_pause.clicked.connect(self.toggle_play_pause)
+        self.btn_play_pause = QPushButton()
+        self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.btn_play_pause.setToolTip("Start")
+        self.btn_play_pause.clicked.connect(self.toggle_play_pause)
 
-        self.btn_reset = QPushButton("↺ Reset")
+        self.btn_reset = QPushButton()
+        self.btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.btn_reset.setToolTip("Reset Data")
         self.btn_reset.setEnabled(False)
         self.btn_reset.clicked.connect(self.reset_measurement)
         
-        self.btn_zoom = QPushButton("🔍 Zoom")
+        self.btn_zoom = QPushButton("⌕")
+        self.btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.btn_zoom.setCheckable(True)
         self.btn_zoom.setToolTip("Toggle Zoom Mode")
         self.btn_zoom.clicked.connect(self.toggle_zoom)
 
-        self.btn_auto_range = QPushButton("⤢ Auto Range")
+        self.btn_auto_range = QPushButton("⤢")
+        self.btn_auto_range.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.btn_auto_range.setToolTip("Enable continuous Auto Range")
         self.btn_auto_range.clicked.connect(self.force_auto_range)
         
-        self.btn_export = QPushButton("↓ Export")
+        self.btn_export = QPushButton()
+        self.btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
         self.btn_export.setToolTip("Export Data")
         self.btn_export.setEnabled(False)
         self.btn_export.clicked.connect(self.export_data)
@@ -557,6 +535,7 @@ class MainWindow(QMainWindow):
         self.mode_combo.addItems(["Free Running", "Single", "Repeating"])
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         
+        controls.addWidget(self.btn_play_pause)
         controls.addWidget(self.btn_play_pause)
         controls.addWidget(self.btn_reset)
         controls.addWidget(self.btn_zoom)
@@ -638,12 +617,14 @@ class MainWindow(QMainWindow):
         self.hist_btn_play_pause.setToolTip("Start")
         self.hist_btn_play_pause.clicked.connect(self.toggle_histogram_play_pause)
 
-        self.hist_btn_reset = QPushButton("↺ Reset")
+        self.hist_btn_reset = QPushButton()
+        self.hist_btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.hist_btn_reset.setToolTip("Reset Data")
         self.hist_btn_reset.setEnabled(False)
         self.hist_btn_reset.clicked.connect(self.reset_histogram_measurement)
         
-        self.hist_btn_export = QPushButton("↓ Export")
+        self.hist_btn_export = QPushButton()
+        self.hist_btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
         self.hist_btn_export.setToolTip("Export Data")
         self.hist_btn_export.setEnabled(False)
         self.hist_btn_export.clicked.connect(self.export_histogram_data)
@@ -663,15 +644,18 @@ class MainWindow(QMainWindow):
         self.hist_n_values_input.setMaximumWidth(80)
         self.hist_n_values_input.returnPressed.connect(self.quick_restart_histogram)
         
-        self.hist_btn_zoom = QPushButton("🔍 Zoom")
+        self.hist_btn_zoom = QPushButton("⌕")
+        self.hist_btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.hist_btn_zoom.setCheckable(True)
         self.hist_btn_zoom.setToolTip("Toggle Zoom Mode")
         self.hist_btn_zoom.clicked.connect(self.hist_toggle_zoom)
         
-        self.hist_btn_auto_range = QPushButton("⤢ Auto Range")
+        self.hist_btn_auto_range = QPushButton("⤢")
+        self.hist_btn_auto_range.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.hist_btn_auto_range.setToolTip("Enable Auto Range")
         self.hist_btn_auto_range.clicked.connect(self.hist_force_auto_range)
 
+        controls.addWidget(self.hist_btn_play_pause)
         controls.addWidget(self.hist_btn_play_pause)
         controls.addWidget(self.hist_btn_reset)
         controls.addWidget(self.hist_btn_zoom)
@@ -894,7 +878,7 @@ class MainWindow(QMainWindow):
                 return
                 
             try:
-                duration_minutes = int(self.duration_input.text()) if hasattr(self, 'duration_input') else 60
+                duration_minutes = int(self.duration_input.text())
             except ValueError:
                 QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for duration.")
                 return
@@ -1073,7 +1057,7 @@ class MainWindow(QMainWindow):
 
         user_name = self.user_name_input.text().strip() or "maas-gui-client"
         try:
-            duration_minutes = int(self.duration_input.text()) if hasattr(self, 'duration_input') else 60
+            duration_minutes = int(self.duration_input.text())
         except ValueError:
             duration_minutes = 60
 
@@ -1144,8 +1128,12 @@ class MainWindow(QMainWindow):
             if self.hist_worker.is_paused:
                 self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
                 self.hist_btn_play_pause.setToolTip("Resume")
+                self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+                self.hist_btn_play_pause.setToolTip("Resume")
                 self.hist_btn_export.setEnabled(True)
             else:
+                self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+                self.hist_btn_play_pause.setToolTip("Pause")
                 self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
                 self.hist_btn_play_pause.setToolTip("Pause")
                 self.hist_btn_export.setEnabled(False)
