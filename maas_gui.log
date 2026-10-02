@@ -1174,3 +1174,50 @@
 2026-09-11 12:45:11,510 [INFO] __main__: Starting MaaS GUI Application
 2026-09-11 12:45:13,505 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [Errno 61] Connection refused"))
 2026-09-11 12:45:41,172 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:29:15,892 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:29:25,496 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1f8d9f0cad0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-09-25 16:30:02,073 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:30:07,294 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:30:18,353 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:35:53,552 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:36:03,396 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:42:59,966 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:43:37,262 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:46:04,357 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:46:18,784 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-09-25 16:46:18,786 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-09-25 16:46:18,820 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/29cc7742-483a-4c21-bb9f-26e262542358
+2026-09-25 16:46:18,827 [INFO] hardware.worker: WebSocket connected successfully!
+2026-09-25 16:46:25,299 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:46:26,891 [INFO] hardware.worker: Successfully stopped measurement 29cc7742-483a-4c21-bb9f-26e262542358
+2026-09-25 16:46:26,913 [INFO] hardware.worker: Successfully released channels for admin
+2026-09-25 16:46:26,935 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-09-25 16:46:37,511 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:46:41,315 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1c94e8d4ad0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-09-25 16:46:57,612 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:49:12,339 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:51:42,823 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:51:46,389 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x23adf544c20>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-09-25 16:54:06,545 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:54:17,624 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x225c1894ec0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-09-25 16:54:27,984 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:54:40,146 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:54:44,096 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x299b0894ec0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-09-25 16:56:14,496 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-09-25 16:57:03,426 [INFO] __main__: Starting MaaS GUI Application
+2026-09-25 16:57:07,315 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x25c3e9b4ad0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-09-25 16:57:17,664 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 09:50:36,844 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 09:50:42,138 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1b3ffeb4ad0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-02 09:50:55,370 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 09:51:28,983 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 09:51:44,105 [INFO] hardware.worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-10-02 09:51:44,123 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2] with binwidth=1000000000.0, n_values=1000, duration=60m, refresh=25Hz
+2026-10-02 09:51:44,124 [INFO] hardware.worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-10-02 09:51:44,154 [INFO] hardware.worker: Connecting to WebSocket: ws://127.0.0.1:8000/api/v1/measurements/stream/f2854dbb-e680-4c64-917c-d839355b2dd0
+2026-10-02 09:51:44,186 [INFO] hardware.worker: WebSocket connected successfully!
+2026-10-02 09:51:58,259 [INFO] hardware.worker: Successfully stopped measurement f2854dbb-e680-4c64-917c-d839355b2dd0
+2026-10-02 09:51:58,279 [INFO] hardware.worker: Successfully released channels for admin
+2026-10-02 10:43:15,341 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 10:52:32,826 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 10:53:05,894 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...

@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QMessageBox,
                              QTabWidget, QGridLayout, QScrollArea, QCheckBox,
-                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox)
+                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox, QStackedWidget)
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -250,13 +250,19 @@ class SITimeAxisItem(pg.AxisItem):
             strings.append(formatted)
         return strings
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        self.auth_token = ""
+        self.login_username = ""
+        
         self.setWindowTitle("Swabian Count Rate Monitor")
-        self.resize(1000, 700)
+        self.resize(250, 180)
         self.worker = None
         self.old_workers = []
+        self.session = requests.Session()
         
         self.setStyleSheet("""
             QMainWindow, QDialog {
@@ -304,10 +310,87 @@ class MainWindow(QMainWindow):
             }
         """)
         
-        # Central widget and layout
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        main_layout = QVBoxLayout(main_widget)
+        self.stacked_widget = QStackedWidget()
+        self.setCentralWidget(self.stacked_widget)
+        
+        self.build_login_screen()
+        self.build_main_app()
+        
+        self.stacked_widget.addWidget(self.login_widget)
+        self.stacked_widget.addWidget(self.main_app_widget)
+        self.stacked_widget.setCurrentWidget(self.login_widget)
+
+
+    def build_login_screen(self):
+        self.login_widget = QWidget()
+        layout = QVBoxLayout(self.login_widget)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(8)
+        
+        lbl_title = QLabel("Login")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 8px;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_title, alignment=Qt.AlignmentFlag.AlignHCenter)
+        
+        self.login_username_input = QLineEdit()
+        self.login_username_input.setPlaceholderText("Username")
+        self.login_username_input.setFixedWidth(180)
+        self.login_username_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 2px;")
+        
+        self.login_password_input = QLineEdit()
+        self.login_password_input.setPlaceholderText("Password")
+        self.login_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.login_password_input.setFixedWidth(180)
+        self.login_password_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 2px;")
+        
+        self.btn_login = QPushButton("Login")
+        self.btn_login.setFixedWidth(180)
+        self.btn_login.setStyleSheet("QPushButton { background-color: #111111; color: white; padding: 4px; border-radius: 2px; } QPushButton:hover { background-color: #333333; }")
+        
+        self.btn_login.setDefault(True)
+        self.btn_login.setAutoDefault(True)
+        self.login_username_input.returnPressed.connect(self.login_password_input.setFocus)
+        self.login_password_input.returnPressed.connect(self.btn_login.click)
+        self.btn_login.clicked.connect(self.authenticate)
+        
+        layout.addWidget(self.login_username_input, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self.login_password_input, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self.btn_login, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+    def authenticate(self):
+        username = self.login_username_input.text().strip()
+        password = self.login_password_input.text().strip()
+        if not username or not password:
+            QMessageBox.warning(self, "Invalid Input", "User Name and Password cannot be empty.")
+            return
+            
+        try:
+            import requests
+            resp = requests.post("http://127.0.0.1:8000/auth/login", json={"username": username, "password": password}, timeout=5)
+            if resp.status_code == 401:
+                QMessageBox.warning(self, "Authentication Failed", "Invalid credentials")
+                return
+            resp.raise_for_status()
+            self.auth_token = resp.json().get("token")
+            self.login_username = username
+        except Exception as e:
+            QMessageBox.warning(self, "Connection Error", f"Could not connect to backend to authenticate:\n{e}")
+            return
+            
+        self.session.headers.update({"Authorization": f"Bearer {self.auth_token}"})
+        
+        # Set the fixed username
+        self.user_name_input.setText(self.login_username)
+        self.user_name_input.setReadOnly(True)
+        self.user_name_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px; background-color: #f0f0f0; color: #555;")
+        
+        # Switch to main app
+        self.stacked_widget.setCurrentWidget(self.main_app_widget)
+        self.resize(1000, 700)
+
+    def build_main_app(self):
+        self.main_app_widget = QWidget()
+        main_layout = QVBoxLayout(self.main_app_widget)
         
         # Tabs
         self.tabs = QTabWidget()
@@ -317,16 +400,79 @@ class MainWindow(QMainWindow):
         self.build_channels_setup_tab()
         self.build_counter_tab()
         self.build_histogram_tab()
+        self.build_account_tab()
         
         # Add to TabWidget
         self.tabs.addTab(self.setup_tab, "Channels Setup")
         self.tabs.addTab(self.counter_tab, "Counter")
         self.tabs.addTab(self.histogram_tab, "Histograms")
+        self.tabs.addTab(self.account_tab, "Account")
         self.tabs.currentChanged.connect(self.on_tab_changed)
+        
+
+
 
     def on_tab_changed(self, index):
         if self.tabs.tabText(index) == "Histograms":
             self.update_histogram_channel_dropdowns()
+
+    def build_account_tab(self):
+        self.account_tab = QWidget()
+        layout = QVBoxLayout(self.account_tab)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        form_layout = QFormLayout()
+        
+        self.old_password_input = QLineEdit()
+        self.old_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.old_password_input.setFixedWidth(200)
+        
+        self.new_password_input = QLineEdit()
+        self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.new_password_input.setFixedWidth(200)
+        
+        self.confirm_password_input = QLineEdit()
+        self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.confirm_password_input.setFixedWidth(200)
+        
+        form_layout.addRow("Current Password:", self.old_password_input)
+        form_layout.addRow("New Password:", self.new_password_input)
+        form_layout.addRow("Confirm New Password:", self.confirm_password_input)
+        
+        layout.addLayout(form_layout)
+        
+        self.btn_change_password = QPushButton("Change Password")
+        self.btn_change_password.setFixedWidth(200)
+        self.btn_change_password.clicked.connect(self.change_password)
+        
+        layout.addWidget(self.btn_change_password)
+
+    def change_password(self):
+        old_pwd = self.old_password_input.text()
+        new_pwd = self.new_password_input.text()
+        conf_pwd = self.confirm_password_input.text()
+        
+        if not old_pwd or not new_pwd or not conf_pwd:
+            QMessageBox.warning(self, "Error", "All fields are required.")
+            return
+            
+        if new_pwd != conf_pwd:
+            QMessageBox.warning(self, "Error", "New passwords do not match.")
+            return
+            
+        try:
+            resp = self.session.post("http://127.0.0.1:8000/auth/change-password", 
+                json={"old_password": old_pwd, "new_password": new_pwd}, timeout=5)
+            
+            if resp.status_code == 200:
+                QMessageBox.information(self, "Success", "Password updated successfully.")
+                self.old_password_input.clear()
+                self.new_password_input.clear()
+                self.confirm_password_input.clear()
+            else:
+                QMessageBox.warning(self, "Error", f"Failed to update password: {resp.text}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Connection error: {e}")
 
     def build_channels_setup_tab(self):
         self.setup_tab = QWidget()
@@ -402,7 +548,7 @@ class MainWindow(QMainWindow):
 
     def fetch_booked_channels(self):
         try:
-            resp = requests.get("http://127.0.0.1:8000/api/v1/channels", timeout=2)
+            resp = self.session.get("http://127.0.0.1:8000/api/v1/channels", timeout=2)
             if resp.status_code == 200:
                 # Clear all first
                 for container in self.channel_nodes.values():
@@ -437,7 +583,7 @@ class MainWindow(QMainWindow):
                 "user_name": user_name,
                 "channel_numbers": channels
             }
-            resp = requests.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
+            resp = self.session.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
             if resp.status_code == 201:
                 logger.info(f"Booked channels: {channels}")
             else:
@@ -468,7 +614,7 @@ class MainWindow(QMainWindow):
         
         try:
             # Release all for user
-            resp = requests.post(f"http://127.0.0.1:8000/api/v1/channels/release/{user_name}", timeout=2)
+            resp = self.session.post(f"http://127.0.0.1:8000/api/v1/channels/release/{user_name}", timeout=2)
             if resp.status_code == 200:
                 logger.info(f"Released all channels for {user_name}")
                 # Re-book the ones they want to keep
@@ -477,7 +623,7 @@ class MainWindow(QMainWindow):
                         "user_name": user_name,
                         "channel_numbers": to_keep
                     }
-                    book_resp = requests.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
+                    book_resp = self.session.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
                     if book_resp.status_code != 201:
                         QMessageBox.warning(self, "Re-booking Failed", f"Released channels, but failed to re-book kept channels: {book_resp.text}")
             else:
@@ -535,7 +681,6 @@ class MainWindow(QMainWindow):
         self.mode_combo.addItems(["Free Running", "Single", "Repeating"])
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         
-        controls.addWidget(self.btn_play_pause)
         controls.addWidget(self.btn_play_pause)
         controls.addWidget(self.btn_reset)
         controls.addWidget(self.btn_zoom)
@@ -655,7 +800,6 @@ class MainWindow(QMainWindow):
         self.hist_btn_auto_range.setToolTip("Enable Auto Range")
         self.hist_btn_auto_range.clicked.connect(self.hist_force_auto_range)
 
-        controls.addWidget(self.hist_btn_play_pause)
         controls.addWidget(self.hist_btn_play_pause)
         controls.addWidget(self.hist_btn_reset)
         controls.addWidget(self.hist_btn_zoom)
@@ -780,7 +924,7 @@ class MainWindow(QMainWindow):
     def start_measurement(self):
         # Verify Backend Health
         try:
-            health_resp = requests.get("http://127.0.0.1:8000/health", timeout=2)
+            health_resp = self.session.get("http://127.0.0.1:8000/health", timeout=2)
             if health_resp.status_code != 200 or health_resp.json().get("status") != "healthy":
                 logger.warning(f"MaaS backend is not healthy. Status Code: {health_resp.status_code}. Falling back to mock data mode.")
         except Exception as e:
@@ -877,12 +1021,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Invalid Name", "Please enter a user name.")
                 return
                 
-            try:
-                duration_minutes = int(self.duration_input.text())
-            except ValueError:
-                QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for duration.")
-                return
-                
             # Base refresh rate for Free Running / Single is 25Hz
             refresh_rate = 25
                 
@@ -899,7 +1037,7 @@ class MainWindow(QMainWindow):
                 else:
                     self.plot_widget.setLabel('left', f'Counts / {binwidth}ps')
             
-            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, duration_minutes, refresh_rate, mode=mode)
+            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, refresh_rate, mode=mode, auth_token=self.auth_token)
             self.worker.finished.connect(self.on_worker_finished)
             
             if self.worker.booking_error:
@@ -909,7 +1047,7 @@ class MainWindow(QMainWindow):
                 
             self.worker.newDataReady.connect(self.update_plot)
             self.worker.start()
-            logger.info(f"Measurement started successfully for user {user_name} on channels {channels} with binwidth={binwidth}, n_values={n_values}, duration={duration_minutes}m, refresh={refresh_rate}Hz")
+            logger.info(f"Measurement started successfully for user {user_name} on channels {channels} with binwidth={binwidth}, n_values={n_values}, refresh={refresh_rate}Hz")
         self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
         self.btn_play_pause.setToolTip("Pause")
         self.btn_reset.setEnabled(True)
@@ -1056,11 +1194,6 @@ class MainWindow(QMainWindow):
             self.hist_x_buffer = np.zeros(n_values)
 
         user_name = self.user_name_input.text().strip() or "maas-gui-client"
-        try:
-            duration_minutes = int(self.duration_input.text())
-        except ValueError:
-            duration_minutes = 60
-
         mode = self.hist_mode_combo.currentText()
 
         self.hist_worker = HistogramWorker(
@@ -1069,7 +1202,6 @@ class MainWindow(QMainWindow):
             user_name=user_name,
             binwidth=binwidth,
             n_values=n_values,
-            duration_minutes=duration_minutes,
             mode=mode
         )
 
@@ -1264,16 +1396,12 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, 'old_workers'):
             for old_worker in self.old_workers:
-                if old_worker.isRunning():
-                    old_worker.wait(15000)
+                old_worker.force_teardown()
                     
         if self.worker:
-            self.worker.stop()
-            # Wait for the background thread to timeout (max 2s) and exit cleanly (max 15s)
-            self.worker.wait(15000) 
+            self.worker.force_teardown()
             
         if hasattr(self, 'hist_worker') and self.hist_worker:
-            self.hist_worker.stop()
-            self.hist_worker.wait(15000)
+            self.hist_worker.force_teardown()
             
         event.accept()

@@ -4,6 +4,7 @@ import requests
 import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
+import atexit
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class HistogramWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray, np.ndarray)
     
-    def __init__(self, start_channel, click_channel, user_name, binwidth, n_values, duration_minutes, mode):
+    def __init__(self, start_channel, click_channel, user_name, binwidth, n_values, mode, auth_token=""):
         super().__init__()
         self.running = True
         self.start_channel = start_channel
@@ -22,20 +23,25 @@ class HistogramWorker(QThread):
         self.user_name = user_name
         self.binwidth = binwidth
         self.n_values = n_values
-        self.duration_minutes = duration_minutes
         self.mode = mode
         self.base_url = "http://127.0.0.1:8000/api/v1"
         self.ws_base_url = "ws://127.0.0.1:8000/api/v1"
+        self.auth_token = auth_token
+        self.session = requests.Session()
+        if self.auth_token:
+            self.session.headers.update({"Authorization": f"Bearer {self.auth_token}"})
         self.measurement_id = None
         self.ws = None
         self.is_paused = False
         self.booking_error = None
         self.is_mock = False
         
+        atexit.register(self.force_teardown)
+        
         # Book channels with a slight retry in case an old worker is still tearing down
         for attempt in range(5):
             try:
-                resp = requests.get(f"{self.base_url}/channels", timeout=2)
+                resp = self.session.get(f"{self.base_url}/channels", timeout=2)
                 resp.raise_for_status()
                 channels_info = resp.json().get("channels", [])
                 
@@ -58,7 +64,7 @@ class HistogramWorker(QThread):
                 # 2. Book ONLY the channels that are currently available
                 if channels_to_book:
                     logger.info(f"Attempting to book {len(channels_to_book)} channels via MaaS API: {channels_to_book}")
-                    resp = requests.post(f"{self.base_url}/channels/book", json={
+                    resp = self.session.post(f"{self.base_url}/channels/book", json={
                         "user_name": self.user_name,
                         "channel_numbers": channels_to_book
                     }, timeout=2)
@@ -93,7 +99,6 @@ class HistogramWorker(QThread):
                 "Correlation": "correlation-live"
             }
             meas_type = endpoint_map.get(self.mode, "histogram-live")
-            payload_duration = self.duration_minutes * 60
 
             if self.mode == "Correlation":
                 metadata = {
@@ -116,11 +121,10 @@ class HistogramWorker(QThread):
 
             payload = {
                 "measurement_type": meas_type.replace("-", "_"),
-                "duration_seconds": payload_duration,
                 "metadata": metadata
             }
             logger.info(f"Sending histogram measurement request to backend API. Mode: {self.mode}")
-            resp = requests.post(f"{self.base_url}/measurements/{meas_type}", json=payload)
+            resp = self.session.post(f"{self.base_url}/measurements/{meas_type}", json=payload)
             resp.raise_for_status()
             data = resp.json()
             self.measurement_id = data.get("status_id", data.get("measurement_id"))
@@ -204,6 +208,11 @@ class HistogramWorker(QThread):
             return
         self._teardown_done = True
         
+        try:
+            atexit.unregister(self.force_teardown)
+        except Exception:
+            pass
+        
         if getattr(self, 'is_mock', False):
             return
 
@@ -219,7 +228,7 @@ class HistogramWorker(QThread):
             for attempt in range(2):
                 try:
                     # Swabian hardware takes ~5.5s to teardown on the backend!
-                    requests.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
+                    self.session.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
                     logger.info(f"Successfully stopped measurement {self.measurement_id}")
                     break
                 except Exception as e:
@@ -228,7 +237,7 @@ class HistogramWorker(QThread):
         # Release channels
         for attempt in range(2):
             try:
-                requests.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=10)
+                self.session.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=10)
                 logger.info(f"Successfully released channels for {self.user_name}")
                 break
             except Exception as e:
@@ -241,5 +250,10 @@ class HistogramWorker(QThread):
         
     def stop(self):
         self.running = False
+        if self.ws:
+            try:
+                self.ws.close()
+            except Exception:
+                pass
         # Do not call self.wait() or HTTP requests here!
         # They will run in the finally block of the background thread to prevent blocking the GUI.

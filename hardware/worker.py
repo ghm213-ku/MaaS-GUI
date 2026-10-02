@@ -4,6 +4,7 @@ import requests
 import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
+import atexit
 
 logger = logging.getLogger(__name__)
 
@@ -13,29 +14,34 @@ class CountRateWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray)
 
-    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, duration_minutes=60, refresh_rate=25, mode="Free Running"):
+    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token=""):
         super().__init__()
         self.channels = channels
         self.running = True
         self.user_name = user_name
         self.binwidth = binwidth
         self.n_values = n_values
-        self.duration_minutes = duration_minutes
         self.refresh_rate = refresh_rate
         self.mode = mode
         self.base_url = "http://127.0.0.1:8000/api/v1"
         self.ws_base_url = "ws://127.0.0.1:8000/api/v1"
+        self.auth_token = auth_token
+        self.session = requests.Session()
+        if self.auth_token:
+            self.session.headers.update({"Authorization": f"Bearer {self.auth_token}"})
         self.measurement_id = None
         self.ws = None
         self.is_paused = False
         self.booking_error = None
         self.is_mock = False
+        
+        atexit.register(self.force_teardown)
 
         # Book channels with a slight retry in case an old worker is still tearing down
         for attempt in range(5):
             try:
                 # 1. Check current status of all requested channels
-                channels_info = requests.get(f"{self.base_url}/channels", timeout=2).json().get("channels", [])
+                channels_info = self.session.get(f"{self.base_url}/channels", timeout=2).json().get("channels", [])
                 
                 conflict_users = set()
                 channels_to_book = []
@@ -56,7 +62,7 @@ class CountRateWorker(QThread):
                 # 2. Book ONLY the channels that are currently available
                 if channels_to_book:
                     logger.info(f"Attempting to book {len(channels_to_book)} channels via MaaS API: {channels_to_book}")
-                    resp = requests.post(f"{self.base_url}/channels/book", json={
+                    resp = self.session.post(f"{self.base_url}/channels/book", json={
                         "user_name": self.user_name,
                         "channel_numbers": channels_to_book
                     }, timeout=2)
@@ -89,23 +95,18 @@ class CountRateWorker(QThread):
                 payload_binwidth = int(self.binwidth)
                 payload_n_values = 1 # Force exactly 1 bin
                 payload_refresh = int(max(1, min(100, 1e12 / self.binwidth))) # Derive Hz from binwidth, bound between 1-100Hz
-                payload_duration = self.duration_minutes * 60
             elif self.mode == "Single":
                 self.exact_duration_sec = (self.n_values * self.binwidth) / 1e12
                 payload_binwidth = int(self.binwidth)
                 payload_n_values = int(self.n_values)
                 payload_refresh = self.refresh_rate # Use standard refresh rate
-                # Tell backend to run for a long time; the FRONTEND timer will cut it off precisely!
-                payload_duration = self.duration_minutes * 60
             else: # Free Running
                 payload_binwidth = int(self.binwidth)
                 payload_n_values = int(self.n_values)
                 payload_refresh = self.refresh_rate
-                payload_duration = self.duration_minutes * 60
 
             payload = {
                 "measurement_type": "count_rate_live",
-                "duration_seconds": payload_duration,
                 "metadata": {
                     "channels": self.channels,
                     "user_name": self.user_name,
@@ -115,7 +116,7 @@ class CountRateWorker(QThread):
                 }
             }
             logger.info(f"Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: {self.mode}")
-            resp = requests.post(f"{self.base_url}/measurements/count-rate-live", json=payload)
+            resp = self.session.post(f"{self.base_url}/measurements/count-rate-live", json=payload)
             resp.raise_for_status()
             data = resp.json()
             self.measurement_id = data.get("status_id", data.get("measurement_id"))
@@ -226,6 +227,11 @@ class CountRateWorker(QThread):
             return
         self._teardown_done = True
         
+        try:
+            atexit.unregister(self.force_teardown)
+        except Exception:
+            pass
+        
         if getattr(self, 'is_mock', False):
             return
 
@@ -241,7 +247,7 @@ class CountRateWorker(QThread):
             for attempt in range(2):
                 try:
                     # Swabian hardware takes ~5.5s to teardown on the backend!
-                    requests.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
+                    self.session.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
                     logger.info(f"Successfully stopped measurement {self.measurement_id}")
                     break
                 except Exception as e:
@@ -250,7 +256,7 @@ class CountRateWorker(QThread):
         # Release channels
         for attempt in range(2):
             try:
-                requests.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=10)
+                self.session.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=10)
                 logger.info(f"Successfully released channels for {self.user_name}")
                 break
             except Exception as e:
@@ -263,5 +269,10 @@ class CountRateWorker(QThread):
         
     def stop(self):
         self.running = False
+        if self.ws:
+            try:
+                self.ws.close()
+            except Exception:
+                pass
         # Do not call self.wait() or HTTP requests here!
         # They will run in the finally block of the background thread to prevent blocking the GUI.
