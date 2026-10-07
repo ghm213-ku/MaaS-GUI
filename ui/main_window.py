@@ -957,6 +957,18 @@ class MainWindow(QMainWindow):
         self.hist_btn_filter.clicked.connect(self.toggle_hist_filter)
         self.hist_btn_filter.hide()
         
+        self.hist_filter_min_input = QLineEdit()
+        self.hist_filter_min_input.setPlaceholderText("Min X")
+        self.hist_filter_min_input.setMaximumWidth(80)
+        self.hist_filter_min_input.hide()
+        self.hist_filter_min_input.returnPressed.connect(self.update_hist_region_from_inputs)
+        
+        self.hist_filter_max_input = QLineEdit()
+        self.hist_filter_max_input.setPlaceholderText("Max X")
+        self.hist_filter_max_input.setMaximumWidth(80)
+        self.hist_filter_max_input.hide()
+        self.hist_filter_max_input.returnPressed.connect(self.update_hist_region_from_inputs)
+        
         self.hist_mode_combo = QComboBox()
         self.hist_mode_combo.addItems(["Start-Stop", "Histogram", "Correlation"])
         self.hist_mode_combo.currentIndexChanged.connect(self.on_hist_mode_changed)
@@ -989,6 +1001,8 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.hist_btn_auto_range)
         controls.addWidget(self.hist_btn_export)
         controls.addWidget(self.hist_btn_filter)
+        controls.addWidget(self.hist_filter_min_input)
+        controls.addWidget(self.hist_filter_max_input)
         
         controls.addSpacing(20)
         controls.addWidget(QLabel("Mode:"))
@@ -1021,6 +1035,7 @@ class MainWindow(QMainWindow):
         
         self.hist_region = pg.LinearRegionItem(brush=(255, 255, 0, 50))
         self.hist_region.setZValue(10)
+        self.hist_region.sigRegionChanged.connect(self.update_hist_filter_inputs_from_region)
         self.hist_region.hide()
         self.hist_plot_widget.addItem(self.hist_region)
 
@@ -1435,10 +1450,58 @@ class MainWindow(QMainWindow):
         self.tabs.setTabEnabled(0, False)
         self.tabs.setTabEnabled(1, False)
         
+    def format_time_string(self, s_val):
+        abs_val = abs(s_val)
+        if abs_val == 0:
+            return "0s"
+        elif abs_val >= 1.0:
+            return f"{s_val:.3g}s"
+        elif abs_val >= 1e-3:
+            return f"{s_val * 1e3:.3g}ms"
+        elif abs_val >= 1e-6:
+            return f"{s_val * 1e6:.3g}us"
+        elif abs_val >= 1e-9:
+            return f"{s_val * 1e9:.3g}ns"
+        else:
+            return f"{s_val * 1e12:.3g}ps"
+
+    def parse_time_string(self, text):
+        import re
+        text = text.strip().lower()
+        match = re.match(r"^(-?[\d\.]+(?:e-?\d+)?)\s*(ps|ns|us|ms|s)?$", text)
+        if not match:
+            raise ValueError("Invalid format")
+        val_str, unit = match.groups()
+        val = float(val_str)
+        if unit == "ms":
+            val *= 1e-3
+        elif unit == "us":
+            val *= 1e-6
+        elif unit == "ns":
+            val *= 1e-9
+        elif unit == "ps":
+            val *= 1e-12
+        return val
+
+    def update_hist_filter_inputs_from_region(self):
+        minX, maxX = self.hist_region.getRegion()
+        self.hist_filter_min_input.setText(self.format_time_string(minX))
+        self.hist_filter_max_input.setText(self.format_time_string(maxX))
+
+    def update_hist_region_from_inputs(self):
+        try:
+            minX = self.parse_time_string(self.hist_filter_min_input.text())
+            maxX = self.parse_time_string(self.hist_filter_max_input.text())
+            self.hist_region.setRegion([minX, maxX])
+        except ValueError:
+            pass
+
     def toggle_hist_filter(self):
         if self.hist_btn_filter.isChecked():
             self.hist_region.show()
             self.hist_filter_plot_widget.show()
+            self.hist_filter_min_input.show()
+            self.hist_filter_max_input.show()
             self.hist_filter_ydata = []
             self.hist_filter_xdata = []
             self.hist_filter_curve.setData([], [])
@@ -1558,6 +1621,12 @@ class MainWindow(QMainWindow):
                 
         if hasattr(self, 'hist_btn_filter'):
             self.hist_btn_filter.show()
+            if self.hist_btn_filter.isChecked():
+                self.hist_filter_min_input.show()
+                self.hist_filter_max_input.show()
+            else:
+                self.hist_filter_min_input.hide()
+                self.hist_filter_max_input.hide()
 
     def quick_restart_histogram(self):
         if self.hist_worker:
@@ -1574,6 +1643,8 @@ class MainWindow(QMainWindow):
         self.hist_plot_widget.addItem(self.hist_region)
         if not self.hist_btn_filter.isChecked():
             self.hist_region.hide()
+            self.hist_filter_min_input.hide()
+            self.hist_filter_max_input.hide()
         self.hist_plot_curve = None
         self.hist_data_buffer = None
         self.hist_x_buffer = None
