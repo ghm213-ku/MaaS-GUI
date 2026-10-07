@@ -418,13 +418,31 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.coincidences_tab, "Coincidences")
         self.tabs.addTab(self.account_tab, "Account")
         self.tabs.currentChanged.connect(self.on_tab_changed)
+
+        # Add + button to tabs
+        from PyQt6.QtWidgets import QToolButton
+        self.add_tab_btn = QToolButton()
+        self.add_tab_btn.setText("+")
+        self.add_tab_btn.setFixedSize(25, 25)
+        self.add_tab_btn.setStyleSheet("font-weight: bold; font-size: 16px;")
+        self.add_tab_btn.clicked.connect(self.add_new_histogram_tab)
+        self.tabs.setCornerWidget(self.add_tab_btn, Qt.Corner.TopRightCorner)
+
         
 
 
 
+
+    def set_other_tabs_enabled(self, enabled, current_index):
+        for i in range(self.tabs.count()):
+            if i != current_index:
+                self.tabs.setTabEnabled(i, enabled)
+
     def on_tab_changed(self, index):
         if self.tabs.tabText(index) == "Histograms":
             self.update_histogram_channel_dropdowns()
+        elif self.tabs.tabText(index) == "Histograms 2":
+            self.update_histogram_channel_dropdowns_2()
         elif self.tabs.tabText(index) == "Coincidences":
             self.update_coincidences_channel_dropdowns()
 
@@ -683,6 +701,12 @@ class MainWindow(QMainWindow):
         self.btn_reset.setToolTip("Reset Data")
         self.btn_reset.setEnabled(False)
         self.btn_reset.clicked.connect(self.reset_measurement)
+
+        self.btn_stop = QPushButton()
+        self.btn_stop.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+        self.btn_stop.setToolTip("Stop Measurement (keep data)")
+        self.btn_stop.setEnabled(False)
+        self.btn_stop.clicked.connect(self.stop_measurement)
         
         self.btn_zoom = QPushButton("⌕")
         self.btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
@@ -711,6 +735,7 @@ class MainWindow(QMainWindow):
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         
         controls.addWidget(self.btn_play_pause)
+        controls.addWidget(self.btn_stop)
         controls.addWidget(self.btn_reset)
         controls.addWidget(self.btn_zoom)
         controls.addWidget(self.btn_auto_range)
@@ -795,8 +820,15 @@ class MainWindow(QMainWindow):
         self.coinc_btn_reset.setToolTip("Reset Data")
         self.coinc_btn_reset.setEnabled(False)
         self.coinc_btn_reset.clicked.connect(self.reset_coincidences_measurement)
+
+        self.coinc_btn_stop = QPushButton()
+        self.coinc_btn_stop.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+        self.coinc_btn_stop.setToolTip("Stop Measurement (keep data)")
+        self.coinc_btn_stop.setEnabled(False)
+        self.coinc_btn_stop.clicked.connect(self.stop_coincidences_measurement)
         
         controls.addWidget(self.coinc_btn_play_pause)
+        controls.addWidget(self.coinc_btn_stop)
         controls.addWidget(self.coinc_btn_reset)
         
         controls.addSpacing(20)
@@ -908,7 +940,8 @@ class MainWindow(QMainWindow):
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
         self.coinc_btn_play_pause.setToolTip("Pause")
         self.coinc_btn_reset.setEnabled(True)
-        self.tabs.setTabEnabled(0, False)
+        self.coinc_btn_stop.setEnabled(True)
+        self.set_other_tabs_enabled(False, 3)
 
     def pause_coincidences_measurement(self):
         if self.coinc_worker:
@@ -920,6 +953,18 @@ class MainWindow(QMainWindow):
             else:
                 self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
                 self.coinc_btn_play_pause.setToolTip("Pause")
+
+
+    def stop_coincidences_measurement(self):
+        if self.coinc_worker:
+            self.coinc_worker.stop()
+            self.coinc_worker = None
+        from PyQt6.QtWidgets import QStyle
+        self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.coinc_btn_play_pause.setToolTip("Start")
+        self.coinc_btn_reset.setEnabled(True)
+        self.coinc_btn_stop.setEnabled(False)
+        self.set_other_tabs_enabled(True, 3)
 
     def reset_coincidences_measurement(self):
         if self.coinc_worker:
@@ -933,7 +978,8 @@ class MainWindow(QMainWindow):
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.coinc_btn_play_pause.setToolTip("Start")
         self.coinc_btn_reset.setEnabled(False)
-        self.tabs.setTabEnabled(0, True)
+        self.coinc_btn_stop.setEnabled(False)
+        self.set_other_tabs_enabled(True, 3)
 
     def update_coincidences_plot(self, data):
         import numpy as np
@@ -945,6 +991,13 @@ class MainWindow(QMainWindow):
             self.coinc_ydata = self.coinc_ydata[-100:]
             
         self.coinc_plot_curve.setData(self.coinc_ydata)
+
+
+    def add_new_histogram_tab(self):
+        if not hasattr(self, 'histogram_tab_2'):
+            self.build_histogram_tab_2()
+            self.tabs.insertTab(3, self.histogram_tab_2, "Histograms 2")
+            self.add_tab_btn.setEnabled(False) # Max 2 tabs
 
     def build_histogram_tab(self):
         self.histogram_tab = QWidget()
@@ -963,6 +1016,12 @@ class MainWindow(QMainWindow):
         self.hist_btn_reset.setToolTip("Reset Data")
         self.hist_btn_reset.setEnabled(False)
         self.hist_btn_reset.clicked.connect(self.reset_histogram_measurement)
+
+        self.hist_btn_stop = QPushButton()
+        self.hist_btn_stop.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+        self.hist_btn_stop.setToolTip("Stop Measurement (keep data)")
+        self.hist_btn_stop.setEnabled(False)
+        self.hist_btn_stop.clicked.connect(self.stop_histogram_measurement)
         
         self.hist_btn_export = QPushButton()
         self.hist_btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
@@ -1011,6 +1070,7 @@ class MainWindow(QMainWindow):
         self.hist_btn_auto_range.clicked.connect(self.hist_force_auto_range)
 
         controls.addWidget(self.hist_btn_play_pause)
+        controls.addWidget(self.hist_btn_stop)
         controls.addWidget(self.hist_btn_reset)
         controls.addWidget(self.hist_btn_zoom)
         controls.addWidget(self.hist_btn_auto_range)
@@ -1073,6 +1133,140 @@ class MainWindow(QMainWindow):
         # Initialize UI state based on default mode
         self.on_hist_mode_changed()
 
+    def build_histogram_tab_2(self):
+        self.histogram_tab_2 = QWidget()
+        layout = QVBoxLayout(self.histogram_tab_2)
+        
+        # Controls
+        controls = QHBoxLayout()
+        
+        self.hist2_btn_play_pause = QPushButton()
+        self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist2_btn_play_pause.setToolTip("Start")
+        self.hist2_btn_play_pause.clicked.connect(self.toggle_histogram_play_pause_2)
+
+        self.hist2_btn_reset = QPushButton()
+        self.hist2_btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.hist2_btn_reset.setToolTip("Reset Data")
+        self.hist2_btn_reset.setEnabled(False)
+        self.hist2_btn_reset.clicked.connect(self.reset_histogram_measurement_2)
+
+        self.hist2_btn_stop = QPushButton()
+        self.hist2_btn_stop.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+        self.hist2_btn_stop.setToolTip("Stop Measurement (keep data)")
+        self.hist2_btn_stop.setEnabled(False)
+        self.hist2_btn_stop.clicked.connect(self.stop_histogram_measurement_2)
+        
+        self.hist2_btn_export = QPushButton()
+        self.hist2_btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
+        self.hist2_btn_export.setToolTip("Export Data")
+        self.hist2_btn_export.setEnabled(False)
+        self.hist2_btn_export.clicked.connect(self.export_histogram_data_2)
+        
+        self.hist2_btn_filter = QPushButton("Filter")
+        self.hist2_btn_filter.setCheckable(True)
+        self.hist2_btn_filter.setToolTip("Toggle filter region")
+        self.hist2_btn_filter.clicked.connect(self.toggle_hist_filter_2)
+        self.hist2_btn_filter.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.hist2_btn_filter.customContextMenuRequested.connect(self.show_filter_context_menu_2)
+        self.hist2_btn_filter.hide()
+        
+        self.hist2_btn_add_filter = QPushButton("+")
+        self.hist2_btn_add_filter.setToolTip("Add second filter")
+        self.hist2_btn_add_filter.clicked.connect(self.toggle_second_filter_2)
+        self.hist2_btn_add_filter.setMaximumWidth(30)
+        self.hist2_btn_add_filter.hide()
+        
+        self.hist2_mode_combo = QComboBox()
+        self.hist2_mode_combo.addItems(["Start-Stop", "Histogram", "Correlation"])
+        self.hist2_mode_combo.currentIndexChanged.connect(self.on_hist_mode_changed_2)
+        
+        self.hist2_start_combo = QComboBox()
+        self.hist2_click_combo = QComboBox()
+        
+        self.hist2_binwidth_input = QLineEdit("1000") # 1000 ps
+        self.hist2_binwidth_input.setMaximumWidth(80)
+        self.hist2_binwidth_input.returnPressed.connect(self.quick_restart_histogram)
+        
+        self.hist2_n_values_input = QLineEdit("1000")
+        self.hist2_n_values_input.setMaximumWidth(80)
+        self.hist2_n_values_input.returnPressed.connect(self.quick_restart_histogram)
+        
+        self.hist2_btn_zoom = QPushButton("⌕")
+        self.hist2_btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.hist2_btn_zoom.setCheckable(True)
+        self.hist2_btn_zoom.setToolTip("Toggle Zoom Mode")
+        self.hist2_btn_zoom.clicked.connect(self.hist_toggle_zoom_2)
+        
+        self.hist2_btn_auto_range = QPushButton("⤢")
+        self.hist2_btn_auto_range.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.hist2_btn_auto_range.setToolTip("Enable Auto Range")
+        self.hist2_btn_auto_range.clicked.connect(self.hist_force_auto_range_2)
+
+        controls.addWidget(self.hist2_btn_play_pause)
+        controls.addWidget(self.hist2_btn_stop)
+        controls.addWidget(self.hist2_btn_reset)
+        controls.addWidget(self.hist2_btn_zoom)
+        controls.addWidget(self.hist2_btn_auto_range)
+        controls.addWidget(self.hist2_btn_export)
+        controls.addWidget(self.hist2_btn_filter)
+        controls.addWidget(self.hist2_btn_add_filter)
+        
+        controls.addSpacing(20)
+        controls.addWidget(QLabel("Mode:"))
+        controls.addWidget(self.hist2_mode_combo)
+        
+        controls.addSpacing(10)
+        controls.addWidget(QLabel("Start Ch:"))
+        controls.addWidget(self.hist2_start_combo)
+        controls.addWidget(QLabel("Click Ch:"))
+        controls.addWidget(self.hist2_click_combo)
+        
+        controls.addSpacing(10)
+        controls.addWidget(QLabel("Bin_width (ps):"))
+        controls.addWidget(self.hist2_binwidth_input)
+        
+        self.lbl_hist_bins = QLabel("Bins:")
+        controls.addWidget(self.lbl_hist_bins)
+        controls.addWidget(self.hist2_n_values_input)
+        
+        controls.addStretch()
+        layout.addLayout(controls)
+        
+        # Plot
+        self.hist2_plot_widget = pg.PlotWidget(axisItems={'bottom': SITimeAxisItem(orientation='bottom')})
+        self.hist2_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self.hist2_plot_widget.setLabel('bottom', 'Time(s)')
+        self.hist2_plot_widget.setLabel('left', 'Counts per bin')
+        
+        self.hist2_plot_curve = None
+        
+        self.hist2_region = pg.LinearRegionItem(brush=(255, 255, 0, 50))
+        self.hist2_region.setZValue(10)
+        self.hist2_region.hide()
+        self.hist2_plot_widget.addItem(self.hist2_region)
+
+        self.hist2_filter_plot_widget = pg.PlotWidget()
+        self.hist2_filter_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self.hist2_filter_plot_widget.setLabel('bottom', 'Time (s)')
+        self.hist2_filter_plot_widget.setLabel('left', 'Sum in Filter')
+        self.hist2_filter_plot_widget.hide()
+        self.hist2_filter_curve = self.hist2_filter_plot_widget.plot(pen='y')
+        
+        self.hist2_filter_ydata = []
+        self.hist2_filter_xdata = []
+        
+        layout.addWidget(self.hist2_plot_widget)
+        layout.addWidget(self.hist2_filter_plot_widget)
+        
+        layout.setStretchFactor(self.hist2_plot_widget, 3)
+        layout.setStretchFactor(self.hist2_filter_plot_widget, 1)
+        
+        self.hist2_worker = None
+        
+        # Initialize UI state based on default mode
+        self.on_hist_mode_changed_2()
+
     def update_histogram_channel_dropdowns(self):
         channels = self.get_selected_channels()
         channels_str = [str(ch) for ch in channels]
@@ -1098,6 +1292,33 @@ class MainWindow(QMainWindow):
                     self.hist_start_combo.setCurrentText(curr_start)
                 if curr_click in channels_str:
                     self.hist_click_combo.setCurrentText(curr_click)
+
+
+    def update_histogram_channel_dropdowns_2(self):
+        channels = self.get_selected_channels()
+        channels_str = [str(ch) for ch in channels]
+        
+        # Save current selections
+        curr_start = self.hist2_start_combo.currentText()
+        curr_click = self.hist2_click_combo.currentText()
+        
+        self.hist2_start_combo.clear()
+        self.hist2_click_combo.clear()
+        
+        if channels_str:
+            self.hist2_start_combo.addItems(channels_str)
+            self.hist2_click_combo.addItems(channels_str)
+            
+            # Set initial defaults to different channels if possible
+            if not curr_start and not curr_click and len(channels_str) >= 2:
+                self.hist2_start_combo.setCurrentText(channels_str[0])
+                self.hist2_click_combo.setCurrentText(channels_str[1])
+            else:
+                # Restore if still valid
+                if curr_start in channels_str:
+                    self.hist2_start_combo.setCurrentText(curr_start)
+                if curr_click in channels_str:
+                    self.hist2_click_combo.setCurrentText(curr_click)
 
 
     def on_mode_changed(self):
@@ -1282,6 +1503,7 @@ class MainWindow(QMainWindow):
         self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
         self.btn_play_pause.setToolTip("Pause")
         self.btn_reset.setEnabled(True)
+        self.btn_stop.setEnabled(True)
         self.btn_export.setEnabled(False)
         
         mode = self.mode_combo.currentText()
@@ -1291,7 +1513,7 @@ class MainWindow(QMainWindow):
                 self.n_values_input.setEnabled(False)
                 
         self.mode_combo.setEnabled(False)
-        self.tabs.setTabEnabled(0, False) # Disable setup tab while running or paused
+        self.set_other_tabs_enabled(False, 1) # Disable other tabs while running or paused
 
     def quick_restart(self):
         # Only allow quick restart while running if it's Single mode
@@ -1321,7 +1543,7 @@ class MainWindow(QMainWindow):
             self.binwidth_input.setEnabled(True)
             self.n_values_input.setEnabled(True)
         self.mode_combo.setEnabled(True)
-        self.tabs.setTabEnabled(0, True)
+        self.set_other_tabs_enabled(True, 1)
         self.worker = None
 
     def update_plot(self, rates_2d):
@@ -1370,6 +1592,26 @@ class MainWindow(QMainWindow):
                 self.btn_play_pause.setToolTip("Pause")
                 self.btn_export.setEnabled(False)
 
+
+    def stop_measurement(self):
+        if self.worker:
+            self.worker.stop()
+            self.worker = None
+        from PyQt6.QtWidgets import QStyle
+        self.btn_play_pause.setEnabled(True)
+        self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.btn_play_pause.setToolTip("Start")
+        self.btn_reset.setEnabled(True)
+        self.btn_stop.setEnabled(False)
+        self.btn_export.setEnabled(True)
+        
+        mode = self.mode_combo.currentText()
+        if mode != "Repeating":
+            self.binwidth_input.setEnabled(True)
+            self.n_values_input.setEnabled(True)
+        self.mode_combo.setEnabled(True)
+        self.set_other_tabs_enabled(True, 1)
+
     def reset_measurement(self):
         if self.worker:
             self.worker.stop()
@@ -1397,6 +1639,7 @@ class MainWindow(QMainWindow):
         self.btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.btn_play_pause.setToolTip("Start")
         self.btn_reset.setEnabled(False)
+        self.btn_stop.setEnabled(False)
         self.btn_export.setEnabled(False)
         
         mode = self.mode_combo.currentText()
@@ -1405,8 +1648,7 @@ class MainWindow(QMainWindow):
             self.n_values_input.setEnabled(True)
         self.mode_combo.setEnabled(True)
         
-        self.tabs.setTabEnabled(0, True)
-        self.tabs.setTabEnabled(2, True)
+        self.set_other_tabs_enabled(True, 1)
 
     def start_histogram_measurement(self):
         try:
@@ -1456,6 +1698,7 @@ class MainWindow(QMainWindow):
         self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
         self.hist_btn_play_pause.setToolTip("Pause")
         self.hist_btn_reset.setEnabled(True)
+        self.hist_btn_stop.setEnabled(True)
         self.hist_btn_export.setEnabled(False)
         
         self.hist_binwidth_input.setEnabled(False)
@@ -1464,10 +1707,83 @@ class MainWindow(QMainWindow):
         self.hist_start_combo.setEnabled(False)
         self.hist_click_combo.setEnabled(False)
 
-        self.tabs.setTabEnabled(0, False)
-        self.tabs.setTabEnabled(1, False)
+        self.set_other_tabs_enabled(False, 2)
+        
+    def start_histogram_measurement_2(self):
+        try:
+            start_ch = int(self.hist2_start_combo.currentText())
+            click_ch = int(self.hist2_click_combo.currentText())
+            binwidth = float(self.hist2_binwidth_input.text())
+            n_values = int(self.hist2_n_values_input.text())
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Please enter valid numbers for Binwidth and n_values.")
+            return
+
+        if self.hist2_worker is None:
+            self.hist2_plot_widget.clear()
+            self.hist2_plot_curve = self.hist2_plot_widget.plot(pen='b')
+            self.hist2_plot_widget.addItem(self.hist2_region)
+            if hasattr(self, 'hist_region_2'):
+                self.hist2_plot_widget.addItem(self.hist2_region_2)
+            if not self.hist2_btn_filter.isChecked():
+                self.hist2_region.hide()
+                if hasattr(self, 'hist_region_2'):
+                    self.hist2_region_2.hide()
+            self.hist2_data_buffer = np.zeros(n_values)
+            self.hist2_x_buffer = np.zeros(n_values)
+
+        user_name = self.user_name_input.text().strip() or "maas-gui-client"
+        mode = self.hist2_mode_combo.currentText()
+
+        self.hist2_worker = HistogramWorker(
+            start_channel=start_ch,
+            click_channel=click_ch,
+            user_name=user_name,
+            binwidth=binwidth,
+            n_values=n_values,
+            mode=mode,
+            is_mock=self.force_mock
+        )
+
+        if self.hist2_worker.booking_error:
+            QMessageBox.warning(self, "Channel Conflict", self.hist2_worker.booking_error)
+            self.hist2_worker = None
+            return
+
+        self.hist2_worker.newDataReady.connect(self.update_histogram_plot_2)
+        self.hist2_worker.finished.connect(self.on_histogram_worker_finished_2)
+        self.hist2_worker.start()
+
+        self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+        self.hist2_btn_play_pause.setToolTip("Pause")
+        self.hist2_btn_reset.setEnabled(True)
+        self.hist2_btn_stop.setEnabled(True)
+        self.hist2_btn_export.setEnabled(False)
+        
+        self.hist2_binwidth_input.setEnabled(False)
+        self.hist2_n_values_input.setEnabled(False)
+        self.hist2_mode_combo.setEnabled(False)
+        self.hist2_start_combo.setEnabled(False)
+        self.hist2_click_combo.setEnabled(False)
+
+        self.set_other_tabs_enabled(False, 3)
         
     def format_time_string(self, s_val):
+        abs_val = abs(s_val)
+        if abs_val == 0:
+            return "0s"
+        elif abs_val >= 1.0:
+            return f"{s_val:.3g}s"
+        elif abs_val >= 1e-3:
+            return f"{s_val * 1e3:.3g}ms"
+        elif abs_val >= 1e-6:
+            return f"{s_val * 1e6:.3g}us"
+        elif abs_val >= 1e-9:
+            return f"{s_val * 1e9:.3g}ns"
+        else:
+            return f"{s_val * 1e12:.3g}ps"
+
+    def format_time_string_2(self, s_val):
         abs_val = abs(s_val)
         if abs_val == 0:
             return "0s"
@@ -1531,6 +1847,37 @@ class MainWindow(QMainWindow):
                 self.hist_region_2.hide()
                 self.hist_filter_curve_2.setData([], [])
 
+    def toggle_second_filter_2(self):
+        if not getattr(self, 'second_filter_active', False):
+            self.second_filter_active = True
+            self.hist2_btn_add_filter.setText("-")
+            self.hist2_btn_add_filter.setToolTip("Remove second filter")
+            
+            if not hasattr(self, 'hist_region_2'):
+                self.hist2_region_2 = pg.LinearRegionItem(brush=(0, 255, 255, 50))
+                self.hist2_region_2.setZValue(10)
+                self.hist2_plot_widget.addItem(self.hist2_region_2)
+                self.hist2_filter_curve_2 = self.hist2_filter_plot_widget.plot(pen='c')
+                
+            self.hist2_region_2.show()
+            
+            if hasattr(self, 'hist_x_buffer') and len(self.hist2_x_buffer) > 0:
+                mid = len(self.hist2_x_buffer) // 2
+                span = (self.hist2_x_buffer[-1] - self.hist2_x_buffer[0]) * 0.1
+                if span == 0: span = 1
+                self.hist2_region_2.setRegion([self.hist2_x_buffer[mid], self.hist2_x_buffer[mid] + span*2])
+                
+            self.hist2_filter_ydata_2 = []
+            if hasattr(self, 'hist_filter_ydata') and len(self.hist2_filter_ydata) > 0:
+                self.hist2_filter_ydata_2 = [0] * len(self.hist2_filter_ydata)
+        else:
+            self.second_filter_active = False
+            self.hist2_btn_add_filter.setText("+")
+            self.hist2_btn_add_filter.setToolTip("Add second filter")
+            if hasattr(self, 'hist_region_2'):
+                self.hist2_region_2.hide()
+                self.hist2_filter_curve_2.setData([], [])
+
     def show_filter_context_menu(self, pos):
         if not hasattr(self, 'hist_btn_filter') or not self.hist_btn_filter.isChecked():
             return
@@ -1589,6 +1936,64 @@ class MainWindow(QMainWindow):
         menu.addAction(action)
         menu.exec(self.hist_btn_filter.mapToGlobal(pos))
 
+    def show_filter_context_menu_2(self, pos):
+        if not hasattr(self, 'hist_btn_filter') or not self.hist2_btn_filter.isChecked():
+            return
+            
+        menu = QMenu(self)
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(5, 5, 5, 5)
+        
+        def create_row(label_text, region_item):
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label_text))
+            
+            min_input = QLineEdit()
+            min_input.setPlaceholderText("Min")
+            min_input.setMaximumWidth(80)
+            
+            max_input = QLineEdit()
+            max_input.setPlaceholderText("Max")
+            max_input.setMaximumWidth(80)
+            
+            minX, maxX = region_item.getRegion()
+            min_input.setText(self.format_time_string(minX))
+            max_input.setText(self.format_time_string(maxX))
+            
+            row.addWidget(min_input)
+            row.addWidget(QLabel("-"))
+            row.addWidget(max_input)
+            return row, min_input, max_input
+            
+        row1, min1, max1 = create_row("F1 (Yellow):", self.hist2_region)
+        layout.addLayout(row1)
+        
+        has_f2 = getattr(self, 'second_filter_active', False)
+        if has_f2:
+            row2, min2, max2 = create_row("F2 (Cyan):", self.hist2_region_2)
+            layout.addLayout(row2)
+            
+        def on_enter():
+            try:
+                self.hist2_region.setRegion([self.parse_time_string(min1.text()), self.parse_time_string(max1.text())])
+                if has_f2:
+                    self.hist2_region_2.setRegion([self.parse_time_string(min2.text()), self.parse_time_string(max2.text())])
+                menu.close()
+            except ValueError:
+                pass
+                
+        min1.returnPressed.connect(on_enter)
+        max1.returnPressed.connect(on_enter)
+        if has_f2:
+            min2.returnPressed.connect(on_enter)
+            max2.returnPressed.connect(on_enter)
+            
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(widget)
+        menu.addAction(action)
+        menu.exec(self.hist2_btn_filter.mapToGlobal(pos))
+
     def toggle_hist_filter(self):
         if self.hist_btn_filter.isChecked():
             self.hist_region.show()
@@ -1620,6 +2025,38 @@ class MainWindow(QMainWindow):
             self.hist_btn_add_filter.hide()
             if hasattr(self, 'hist_region_2'):
                 self.hist_region_2.hide()
+
+    def toggle_hist_filter_2(self):
+        if self.hist2_btn_filter.isChecked():
+            self.hist2_region.show()
+            self.hist2_filter_plot_widget.show()
+            self.hist2_btn_add_filter.show()
+            if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_region_2'):
+                self.hist2_region_2.show()
+            self.hist2_filter_ydata = []
+            if getattr(self, 'second_filter_active', False):
+                self.hist2_filter_ydata_2 = []
+            self.hist2_filter_xdata = []
+            self.hist2_filter_curve.setData([], [])
+            if hasattr(self, 'hist_filter_curve_2'):
+                self.hist2_filter_curve_2.setData([], [])
+            
+            import time
+            self.hist2_filter_start_time = time.time()
+            
+            if hasattr(self, 'hist_x_buffer') and self.hist2_x_buffer is not None and len(self.hist2_x_buffer) > 0:
+                mid = len(self.hist2_x_buffer) // 2
+                span = (self.hist2_x_buffer[-1] - self.hist2_x_buffer[0]) * 0.1
+                if span == 0: span = 1
+                self.hist2_region.setRegion([self.hist2_x_buffer[mid] - span, self.hist2_x_buffer[mid] + span])
+            else:
+                self.hist2_region_needs_init = True
+        else:
+            self.hist2_region.hide()
+            self.hist2_filter_plot_widget.hide()
+            self.hist2_btn_add_filter.hide()
+            if hasattr(self, 'hist_region_2'):
+                self.hist2_region_2.hide()
 
     def update_histogram_plot(self, x_data, y_data):
         if self.hist_plot_curve:
@@ -1690,11 +2127,86 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 logger.error(f"Error plotting histogram: {e}")
 
+    def update_histogram_plot_2(self, x_data, y_data):
+        if self.hist2_plot_curve:
+            try:
+                binwidth_ps = float(self.hist2_binwidth_input.text())
+                
+                self.hist2_data_buffer = y_data.flatten()
+                self.hist_x_buffer = x_data.flatten() * 1e-12
+                
+                mode = self.hist2_mode_combo.currentText()
+                if mode == "Correlation" and len(self.hist_x_buffer) > 0 and self.hist_x_buffer[0] >= 0:
+                    self.hist_x_buffer = self.hist_x_buffer - (len(self.hist_x_buffer) * (binwidth_ps * 1e-12) / 2)
+                
+                # Check for empty arrays to prevent pyqtgraph crashes
+                if len(self.hist_x_buffer) == 0 or len(self.hist2_data_buffer) == 0:
+                    self.hist2_plot_curve.setData([], [])
+                else:
+                    self.hist2_plot_curve.setData(self.hist_x_buffer, self.hist2_data_buffer)
+                    
+                    if hasattr(self, 'hist_btn_filter') and self.hist2_btn_filter.isChecked():
+                        if getattr(self, 'hist_region_needs_init', False) and len(self.hist_x_buffer) > 0:
+                            mid = len(self.hist_x_buffer) // 2
+                            span = (self.hist_x_buffer[-1] - self.hist_x_buffer[0]) * 0.1
+                            if span == 0: span = 1
+                            self.hist2_region.setRegion([self.hist_x_buffer[mid] - span, self.hist_x_buffer[mid] + span])
+                            self.hist2_region_needs_init = False
+                            
+                        minX, maxX = self.hist2_region.getRegion()
+                        mask = (self.hist_x_buffer >= minX) & (self.hist_x_buffer <= maxX)
+                        sum_val = np.sum(self.hist2_data_buffer[mask])
+                        
+                        sum_val_2 = 0
+                        if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_region_2'):
+                            minX_2, maxX_2 = self.hist2_region_2.getRegion()
+                            mask_2 = (self.hist_x_buffer >= minX_2) & (self.hist_x_buffer <= maxX_2)
+                            sum_val_2 = np.sum(self.hist2_data_buffer[mask_2])
+                        
+                        import time
+                        if not hasattr(self, 'hist_filter_start_time'):
+                            self.hist2_filter_start_time = time.time()
+                            
+                        elapsed = time.time() - self.hist2_filter_start_time
+                        
+                        self.hist2_filter_ydata.append(sum_val)
+                        if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_ydata_2'):
+                            self.hist2_filter_ydata_2.append(sum_val_2)
+                        self.hist2_filter_xdata.append(elapsed)
+                        
+                        if len(self.hist2_filter_ydata) > 10000:
+                            self.hist2_filter_ydata = self.hist2_filter_ydata[-10000:]
+                            if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_ydata_2'):
+                                self.hist2_filter_ydata_2 = self.hist2_filter_ydata_2[-10000:]
+                            self.hist2_filter_xdata = self.hist2_filter_xdata[-10000:]
+                            
+                        view_x_range = self.hist2_filter_plot_widget.viewRange()[0]
+                        current_window = view_x_range[1] - view_x_range[0]
+                        if current_window < 1 or current_window > 100000:
+                            current_window = 60
+                            
+                        if elapsed > current_window:
+                            self.hist2_filter_plot_widget.setXRange(elapsed - current_window, elapsed, padding=0)
+                        else:
+                            self.hist2_filter_plot_widget.setXRange(0, current_window, padding=0)
+                            
+                        self.hist2_filter_curve.setData(self.hist2_filter_xdata, self.hist2_filter_ydata)
+                        if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_curve_2') and hasattr(self, 'hist_filter_ydata_2'):
+                            self.hist2_filter_curve_2.setData(self.hist2_filter_xdata, self.hist2_filter_ydata_2)
+            except Exception as e:
+                logger.error(f"Error plotting histogram: {e}")
+
     def toggle_histogram_play_pause(self):
         if self.hist_worker is None:
             self.start_histogram_measurement()
         else:
             self.pause_histogram_measurement()
+
+    def toggle_histogram_play_pause_2(self):
+        if self.hist2_worker is None:
+            self.start_histogram_measurement_2()
+        else:
+            self.pause_histogram_measurement_2()
 
     def pause_histogram_measurement(self):
         if self.hist_worker:
@@ -1712,14 +2224,39 @@ class MainWindow(QMainWindow):
                 self.hist_btn_play_pause.setToolTip("Pause")
                 self.hist_btn_export.setEnabled(False)
 
+    def pause_histogram_measurement_2(self):
+        if self.hist2_worker:
+            self.hist2_worker.is_paused = not self.hist2_worker.is_paused
+            if self.hist2_worker.is_paused:
+                self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+                self.hist2_btn_play_pause.setToolTip("Resume")
+                self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+                self.hist2_btn_play_pause.setToolTip("Resume")
+                self.hist2_btn_export.setEnabled(True)
+            else:
+                self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+                self.hist2_btn_play_pause.setToolTip("Pause")
+                self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+                self.hist2_btn_play_pause.setToolTip("Pause")
+                self.hist2_btn_export.setEnabled(False)
+
     def hist_toggle_zoom(self, checked):
         if checked:
             self.hist_plot_widget.getViewBox().setMouseMode(pg.ViewBox.RectMode)
         else:
             self.hist_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
 
+    def hist_toggle_zoom_2(self, checked):
+        if checked:
+            self.hist2_plot_widget.getViewBox().setMouseMode(pg.ViewBox.RectMode)
+        else:
+            self.hist2_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
+
     def hist_force_auto_range(self):
         self.hist_plot_widget.enableAutoRange()
+
+    def hist_force_auto_range_2(self):
+        self.hist2_plot_widget.enableAutoRange()
 
     def on_hist_mode_changed(self):
         mode = self.hist_mode_combo.currentText()
@@ -1735,10 +2272,65 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'hist_btn_filter'):
             self.hist_btn_filter.show()
 
+    def on_hist_mode_changed_2(self):
+        mode = self.hist2_mode_combo.currentText()
+        if mode == "Start-Stop":
+            self.hist2_n_values_input.setEnabled(False)
+            if hasattr(self, 'lbl_hist_bins'):
+                self.lbl_hist_bins.setEnabled(False)
+        else:
+            self.hist2_n_values_input.setEnabled(True)
+            if hasattr(self, 'lbl_hist_bins'):
+                self.lbl_hist_bins.setEnabled(True)
+                
+        if hasattr(self, 'hist_btn_filter'):
+            self.hist2_btn_filter.show()
+
     def quick_restart_histogram(self):
         if self.hist_worker:
             self.reset_histogram_measurement()
             self.start_histogram_measurement()
+
+
+    def quick_restart_histogram_2(self):
+        if self.hist2_worker:
+            self.reset_histogram_measurement()
+            self.start_histogram_measurement_2()
+
+
+    def stop_histogram_measurement(self):
+        if self.hist_worker:
+            self.hist_worker.stop()
+            self.hist_worker = None
+        from PyQt6.QtWidgets import QStyle
+        self.hist_btn_play_pause.setEnabled(True)
+        self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist_btn_play_pause.setToolTip("Start")
+        self.hist_btn_reset.setEnabled(True)
+        self.hist_btn_stop.setEnabled(False)
+        self.hist_btn_export.setEnabled(True)
+        self.hist_binwidth_input.setEnabled(True)
+        self.hist_start_combo.setEnabled(True)
+        self.hist_click_combo.setEnabled(True)
+        self.on_hist_mode_changed()
+        self.set_other_tabs_enabled(True, 2)
+
+    def stop_histogram_measurement_2(self):
+        if self.hist2_worker:
+            self.hist2_worker.stop()
+            self.hist2_worker = None
+        from PyQt6.QtWidgets import QStyle
+        self.hist2_btn_play_pause.setEnabled(True)
+        self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist2_btn_play_pause.setToolTip("Start")
+        self.hist2_btn_reset.setEnabled(True)
+        self.hist2_btn_stop.setEnabled(False)
+        self.hist2_btn_export.setEnabled(True)
+        self.hist2_binwidth_input.setEnabled(True)
+        self.hist2_start_combo.setEnabled(True)
+        self.hist2_click_combo.setEnabled(True)
+        self.on_hist_mode_changed_2()
+        self.set_other_tabs_enabled(True, 3)
 
     def reset_histogram_measurement(self):
         if self.hist_worker:
@@ -1762,6 +2354,7 @@ class MainWindow(QMainWindow):
         self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.hist_btn_play_pause.setToolTip("Start")
         self.hist_btn_reset.setEnabled(False)
+        self.hist_btn_stop.setEnabled(False)
         self.hist_btn_export.setEnabled(False)
         
         self.hist_binwidth_input.setEnabled(True)
@@ -1770,8 +2363,40 @@ class MainWindow(QMainWindow):
         self.hist_click_combo.setEnabled(True)
         self.on_hist_mode_changed()
         
-        self.tabs.setTabEnabled(0, True)
-        self.tabs.setTabEnabled(1, True)
+        self.set_other_tabs_enabled(True, 2)
+
+    def reset_histogram_measurement_2(self):
+        if self.hist2_worker:
+            self.hist2_worker.stop()
+            self.old_workers.append(self.hist2_worker)
+            self.hist2_worker = None
+            
+        self.hist2_plot_widget.clear()
+        self.hist2_plot_widget.addItem(self.hist2_region)
+        if hasattr(self, 'hist_region_2'):
+            self.hist2_plot_widget.addItem(self.hist2_region_2)
+        if not self.hist2_btn_filter.isChecked():
+            self.hist2_region.hide()
+            if hasattr(self, 'hist_region_2'):
+                self.hist2_region_2.hide()
+        self.hist2_plot_curve = None
+        self.hist2_data_buffer = None
+        self.hist2_x_buffer = None
+        
+        self.hist2_btn_play_pause.setEnabled(True)
+        self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist2_btn_play_pause.setToolTip("Start")
+        self.hist2_btn_reset.setEnabled(False)
+        self.hist2_btn_stop.setEnabled(False)
+        self.hist2_btn_export.setEnabled(False)
+        
+        self.hist2_binwidth_input.setEnabled(True)
+        self.hist2_mode_combo.setEnabled(True)
+        self.hist2_start_combo.setEnabled(True)
+        self.hist2_click_combo.setEnabled(True)
+        self.on_hist_mode_changed_2()
+        
+        self.set_other_tabs_enabled(True, 3)
 
     def on_histogram_worker_finished(self):
         self.hist_btn_play_pause.setEnabled(True)
@@ -1786,9 +2411,24 @@ class MainWindow(QMainWindow):
         self.hist_click_combo.setEnabled(True)
         self.on_hist_mode_changed()
         
-        self.tabs.setTabEnabled(0, True)
-        self.tabs.setTabEnabled(1, True)
+        self.set_other_tabs_enabled(True, 2)
         self.hist_worker = None
+
+    def on_histogram_worker_finished_2(self):
+        self.hist2_btn_play_pause.setEnabled(True)
+        self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.hist2_btn_play_pause.setToolTip("Start")
+        self.hist2_btn_reset.setEnabled(True)
+        self.hist2_btn_export.setEnabled(True)
+        
+        self.hist2_binwidth_input.setEnabled(True)
+        self.hist2_mode_combo.setEnabled(True)
+        self.hist2_start_combo.setEnabled(True)
+        self.hist2_click_combo.setEnabled(True)
+        self.on_hist_mode_changed_2()
+        
+        self.set_other_tabs_enabled(True, 3)
+        self.hist2_worker = None
 
     def export_histogram_data(self):
         if self.hist_data_buffer is None:
@@ -1805,6 +2445,31 @@ class MainWindow(QMainWindow):
         try:
             # We will save the x-axis and the histogram values
             data_to_save = np.column_stack([self.hist_x_buffer, self.hist_data_buffer])
+            
+            np.save(file_path, data_to_save)
+            
+            final_path = file_path if file_path.endswith('.npy') else file_path + '.npy'
+            logger.info(f"Exported histogram data successfully to {final_path}")
+            QMessageBox.information(self, "Export Successful", f"Data successfully saved to:\n{final_path}")
+        except Exception as e:
+            logger.error(f"Export Failed: {e}")
+            QMessageBox.critical(self, "Export Failed", f"An error occurred while saving:\n{e}")
+
+    def export_histogram_data_2(self):
+        if self.hist2_data_buffer is None:
+            QMessageBox.warning(self, "No Data", "There is no data to export.")
+            return
+            
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Histogram Data", "", "NumPy Files (*.npy);;All Files (*)"
+        )
+        if not file_path:
+            return
+            
+        try:
+            # We will save the x-axis and the histogram values
+            data_to_save = np.column_stack([self.hist2_x_buffer, self.hist2_data_buffer])
             
             np.save(file_path, data_to_save)
             
