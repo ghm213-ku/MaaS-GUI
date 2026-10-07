@@ -14,7 +14,7 @@ class CountRateWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray)
 
-    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token=""):
+    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token="", is_mock=False):
         super().__init__()
         self.channels = channels
         self.running = True
@@ -33,11 +33,14 @@ class CountRateWorker(QThread):
         self.ws = None
         self.is_paused = False
         self.booking_error = None
-        self.is_mock = False
+        self.is_mock = is_mock
         
         atexit.register(self.force_teardown)
 
-        # Book channels with a slight retry in case an old worker is still tearing down
+        # Book channels with a slight retry
+        if self.is_mock:
+            return
+
         for attempt in range(5):
             try:
                 # 1. Check current status of all requested channels

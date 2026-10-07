@@ -1221,3 +1221,96 @@
 2026-10-02 10:43:15,341 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
 2026-10-02 10:52:32,826 [INFO] __main__: Starting MaaS GUI Application
 2026-10-02 10:53:05,894 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 11:01:30,033 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 11:02:24,174 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 11:52:21,517 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 11:54:14,484 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 11:58:46,611 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 11:59:38,093 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 12:32:26,274 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 12:33:07,356 [INFO] hardware.coincidences_worker: Attempting to book 2 channels via MaaS API: [1, 2]
+2026-10-02 12:33:07,372 [INFO] hardware.coincidences_worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-10-02 12:33:07,408 [ERROR] hardware.coincidences_worker: Hardware/Network Error: 405 Client Error: Method Not Allowed for url: http://127.0.0.1:8000/api/v1/measurements/coincidences-live
+2026-10-02 12:33:07,435 [INFO] hardware.coincidences_worker: Successfully released channels for admin
+2026-10-02 12:33:23,423 [INFO] hardware.coincidences_worker: Attempting to book 2 channels via MaaS API: [3, 2]
+2026-10-02 12:33:23,434 [INFO] hardware.coincidences_worker: Sending measurement request to backend API (this may take ~2 seconds for hardware init). Mode: Free Running
+2026-10-02 12:33:23,451 [ERROR] hardware.coincidences_worker: Hardware/Network Error: 405 Client Error: Method Not Allowed for url: http://127.0.0.1:8000/api/v1/measurements/coincidences-live
+2026-10-02 12:33:23,466 [INFO] hardware.coincidences_worker: Successfully released channels for admin
+2026-10-02 12:33:31,965 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 15:33:42,851 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:34:11,276 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 15:36:07,666 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:36:17,884 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 15:37:15,453 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 15:37:55,965 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:38:09,337 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Correlation
+2026-10-02 15:38:22,878 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 15:39:12,311 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:39:24,426 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 15:39:35,608 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Correlation
+2026-10-02 15:45:01,141 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:45:13,081 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 15:45:42,850 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 15:48:41,383 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:49:03,321 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 15:50:42,886 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 15:56:50,088 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 15:57:03,460 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 15:58:39,459 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-02 16:02:00,125 [INFO] __main__: Starting MaaS GUI Application
+2026-10-02 16:02:03,997 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x17fde490980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-02 16:02:19,259 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 16:04:28,624 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 16:07:19,418 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-02 16:07:57,998 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 10:23:32,538 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 10:23:40,482 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1cc094d0980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 10:24:02,766 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1cc0952fed0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 10:24:02,774 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, refresh=25Hz
+2026-10-07 10:24:02,774 [INFO] hardware.worker: Running mock CountRateWorker in mode: Free Running
+2026-10-07 10:24:21,823 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1cc09598190>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 10:24:21,827 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, refresh=25Hz
+2026-10-07 10:24:21,828 [INFO] hardware.worker: Running mock CountRateWorker in mode: Repeating
+2026-10-07 10:24:46,829 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1cc094e6d70>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 10:24:46,833 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, refresh=25Hz
+2026-10-07 10:24:46,833 [INFO] hardware.worker: Running mock CountRateWorker in mode: Single
+2026-10-07 10:24:47,850 [INFO] hardware.worker: Single measurement duration complete. Stopping mock worker.
+2026-10-07 10:24:47,861 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-10-07 10:24:57,050 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1cc094e7bb0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 10:24:57,054 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, refresh=25Hz
+2026-10-07 10:24:57,055 [INFO] hardware.worker: Running mock CountRateWorker in mode: Single
+2026-10-07 10:24:58,074 [INFO] hardware.worker: Single measurement duration complete. Stopping mock worker.
+2026-10-07 10:24:58,077 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-10-07 10:25:14,807 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 10:25:42,357 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 11:11:49,874 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 11:12:00,045 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137aa0980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:12:52,425 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137affed0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:12:52,442 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, refresh=25Hz
+2026-10-07 11:12:52,444 [INFO] hardware.worker: Running mock CountRateWorker in mode: Free Running
+2026-10-07 11:13:27,791 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137b64190>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:13:27,797 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000.0, n_values=1000, refresh=25Hz
+2026-10-07 11:13:27,798 [INFO] hardware.worker: Running mock CountRateWorker in mode: Single
+2026-10-07 11:13:28,839 [INFO] hardware.worker: Single measurement duration complete. Stopping mock worker.
+2026-10-07 11:13:28,889 [INFO] ui.main_window: Worker thread finished naturally. Restoring UI state.
+2026-10-07 11:13:48,331 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137ab6d70>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:13:48,337 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, refresh=25Hz
+2026-10-07 11:13:48,339 [INFO] hardware.worker: Running mock CountRateWorker in mode: Repeating
+2026-10-07 11:14:41,343 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137ab69e0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:14:41,352 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=100000000000.0, n_values=1, refresh=25Hz
+2026-10-07 11:14:41,353 [INFO] hardware.worker: Running mock CountRateWorker in mode: Repeating
+2026-10-07 11:15:29,085 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 11:18:03,856 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Correlation
+2026-10-07 11:19:11,809 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Histogram
+2026-10-07 11:20:01,118 [INFO] hardware.coincidences_worker: Running mock CountRateWorker in mode: Free Running
+2026-10-07 11:25:51,259 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137b029f0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:25:51,268 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=100000000000.0, n_values=1, refresh=25Hz
+2026-10-07 11:25:51,270 [INFO] hardware.worker: Running mock CountRateWorker in mode: Free Running
+2026-10-07 11:26:15,323 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137b60e20>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:26:15,333 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, refresh=25Hz
+2026-10-07 11:26:15,335 [INFO] hardware.worker: Running mock CountRateWorker in mode: Repeating
+2026-10-07 11:26:51,845 [WARNING] ui.main_window: Could not connect to the MaaS backend. Falling back to mock data mode. Details: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x18137b61bf0>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 11:26:51,856 [INFO] ui.main_window: Measurement started successfully for user admin on channels [1, 2, 3] with binwidth=1000000000000.0, n_values=1, refresh=25Hz
+2026-10-07 11:26:51,858 [INFO] hardware.worker: Running mock CountRateWorker in mode: Free Running
+2026-10-07 11:54:54,523 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Histogram
+2026-10-07 11:58:03,484 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...

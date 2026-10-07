@@ -76,7 +76,8 @@ if __name__ == '__main__':
     # Perform the heavy imports while the splash screen is shown
     from ui.main_window import MainWindow
     
-    window = MainWindow()
+    force_mock = "testing" in sys.argv
+    window = MainWindow(force_mock=force_mock)
     window.show()
     
     splash.finish(window)

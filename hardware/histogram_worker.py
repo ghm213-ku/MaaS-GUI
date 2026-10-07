@@ -14,7 +14,7 @@ class HistogramWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray, np.ndarray)
     
-    def __init__(self, start_channel, click_channel, user_name, binwidth, n_values, mode, auth_token=""):
+    def __init__(self, start_channel, click_channel, user_name, binwidth, n_values, mode, auth_token="", is_mock=False):
         super().__init__()
         self.running = True
         self.start_channel = start_channel
@@ -34,11 +34,14 @@ class HistogramWorker(QThread):
         self.ws = None
         self.is_paused = False
         self.booking_error = None
-        self.is_mock = False
+        self.is_mock = is_mock
         
         atexit.register(self.force_teardown)
         
-        # Book channels with a slight retry in case an old worker is still tearing down
+        # Book channels with a slight retry
+        if self.is_mock:
+            return
+
         for attempt in range(5):
             try:
                 resp = self.session.get(f"{self.base_url}/channels", timeout=2)

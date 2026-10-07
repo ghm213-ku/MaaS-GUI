@@ -16,6 +16,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from hardware.worker import CountRateWorker
 from hardware.histogram_worker import HistogramWorker
+from hardware.coincidences_worker import CoincidencesWorker
 
 class ChannelConfigPopup(QDialog):
     def __init__(self, current_trigger, current_delay, parent=None):
@@ -252,8 +253,9 @@ class SITimeAxisItem(pg.AxisItem):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, force_mock=False):
         super().__init__()
+        self.force_mock = force_mock
         
         self.auth_token = ""
         self.login_username = ""
@@ -364,18 +366,22 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Invalid Input", "User Name and Password cannot be empty.")
             return
             
-        try:
-            import requests
-            resp = requests.post("http://127.0.0.1:8000/auth/login", json={"username": username, "password": password}, timeout=5)
-            if resp.status_code == 401:
-                QMessageBox.warning(self, "Authentication Failed", "Invalid credentials")
-                return
-            resp.raise_for_status()
-            self.auth_token = resp.json().get("token")
+        if getattr(self, 'force_mock', False):
+            self.auth_token = "mock_token"
             self.login_username = username
-        except Exception as e:
-            QMessageBox.warning(self, "Connection Error", f"Could not connect to backend to authenticate:\n{e}")
-            return
+        else:
+            try:
+                import requests
+                resp = requests.post("http://127.0.0.1:8000/auth/login", json={"username": username, "password": password}, timeout=5)
+                if resp.status_code == 401:
+                    QMessageBox.warning(self, "Authentication Failed", "Invalid credentials")
+                    return
+                resp.raise_for_status()
+                self.auth_token = resp.json().get("token")
+                self.login_username = username
+            except Exception as e:
+                QMessageBox.warning(self, "Connection Error", f"Could not connect to backend to authenticate:\n{e}")
+                return
             
         self.session.headers.update({"Authorization": f"Bearer {self.auth_token}"})
         
@@ -400,12 +406,14 @@ class MainWindow(QMainWindow):
         self.build_channels_setup_tab()
         self.build_counter_tab()
         self.build_histogram_tab()
+        self.build_coincidences_tab()
         self.build_account_tab()
         
         # Add to TabWidget
         self.tabs.addTab(self.setup_tab, "Channels Setup")
         self.tabs.addTab(self.counter_tab, "Counter")
         self.tabs.addTab(self.histogram_tab, "Histograms")
+        self.tabs.addTab(self.coincidences_tab, "Coincidences")
         self.tabs.addTab(self.account_tab, "Account")
         self.tabs.currentChanged.connect(self.on_tab_changed)
         
@@ -415,6 +423,8 @@ class MainWindow(QMainWindow):
     def on_tab_changed(self, index):
         if self.tabs.tabText(index) == "Histograms":
             self.update_histogram_channel_dropdowns()
+        elif self.tabs.tabText(index) == "Coincidences":
+            self.update_coincidences_channel_dropdowns()
 
     def build_account_tab(self):
         self.account_tab = QWidget()
@@ -750,6 +760,173 @@ class MainWindow(QMainWindow):
         self.data_buffers = []
         self.active_channels_list = []
 
+    def build_coincidences_tab(self):
+        self.coincidences_tab = QWidget()
+        layout = QVBoxLayout(self.coincidences_tab)
+        
+        controls = QHBoxLayout()
+        
+        self.coinc_btn_play_pause = QPushButton()
+        self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.coinc_btn_play_pause.setToolTip("Start")
+        self.coinc_btn_play_pause.clicked.connect(self.toggle_coincidences_play_pause)
+        
+        self.coinc_btn_reset = QPushButton()
+        self.coinc_btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.coinc_btn_reset.setToolTip("Reset Data")
+        self.coinc_btn_reset.setEnabled(False)
+        self.coinc_btn_reset.clicked.connect(self.reset_coincidences_measurement)
+        
+        controls.addWidget(self.coinc_btn_play_pause)
+        controls.addWidget(self.coinc_btn_reset)
+        
+        controls.addSpacing(20)
+        controls.addWidget(QLabel("Bin width (ps):"))
+        self.coinc_binwidth_input = QLineEdit("1000")
+        self.coinc_binwidth_input.setMaximumWidth(80)
+        controls.addWidget(self.coinc_binwidth_input)
+        
+        controls.addSpacing(20)
+        self.coinc_channels_layout = QHBoxLayout()
+        self.coinc_combos = []
+        
+        # Initial 2 channels
+        self.add_coincidence_channel()
+        self.add_coincidence_channel()
+        
+        self.coinc_btn_add = QPushButton("+")
+        self.coinc_btn_add.setMaximumWidth(30)
+        self.coinc_btn_add.clicked.connect(self.add_coincidence_channel)
+        
+        self.coinc_btn_remove = QPushButton("-")
+        self.coinc_btn_remove.setMaximumWidth(30)
+        self.coinc_btn_remove.clicked.connect(self.remove_coincidence_channel)
+        
+        controls.addLayout(self.coinc_channels_layout)
+        controls.addWidget(self.coinc_btn_add)
+        controls.addWidget(self.coinc_btn_remove)
+        
+        controls.addStretch()
+        layout.addLayout(controls)
+        
+        self.coinc_plot_widget = pg.PlotWidget(axisItems={'bottom': SITimeAxisItem(orientation='bottom')})
+        self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self.coinc_plot_widget.setLabel('bottom', 'Time steps')
+        self.coinc_plot_widget.setLabel('left', 'Coincidence Counts')
+        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+        layout.addWidget(self.coinc_plot_widget)
+        
+        self.coinc_worker = None
+
+    def add_coincidence_channel(self):
+        max_channels = max(2, len(self.get_selected_channels()))
+        if len(self.coinc_combos) >= max_channels:
+            return
+            
+        combo = QComboBox()
+        combo.setFixedWidth(60)
+        self.coinc_combos.append(combo)
+        self.coinc_channels_layout.addWidget(combo)
+        self.update_coincidences_channel_dropdowns()
+
+    def remove_coincidence_channel(self):
+        if len(self.coinc_combos) > 2:
+            combo = self.coinc_combos.pop()
+            self.coinc_channels_layout.removeWidget(combo)
+            combo.deleteLater()
+
+    def update_coincidences_channel_dropdowns(self):
+        channels = self.get_selected_channels()
+        channels_str = [str(ch) for ch in channels]
+        
+        for i, combo in enumerate(self.coinc_combos):
+            curr = combo.currentText()
+            combo.clear()
+            if channels_str:
+                combo.addItems(channels_str)
+                if curr in channels_str:
+                    combo.setCurrentText(curr)
+                elif len(channels_str) > i:
+                    combo.setCurrentText(channels_str[i])
+                else:
+                    combo.setCurrentText(channels_str[0])
+
+    def toggle_coincidences_play_pause(self):
+        if self.coinc_worker is None:
+            self.start_coincidences_measurement()
+        else:
+            self.pause_coincidences_measurement()
+
+    def start_coincidences_measurement(self):
+        channels = []
+        for combo in self.coinc_combos:
+            text = combo.currentText()
+            if text:
+                channels.append(int(text))
+        
+        if len(set(channels)) < 2:
+            QMessageBox.warning(self, "Invalid Selection", "At least two unique channels must be selected.")
+            return
+            
+        try:
+            binwidth = int(self.coinc_binwidth_input.text())
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Bin width must be an integer.")
+            return
+
+        self.coinc_plot_widget.clear()
+        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+
+        self.coinc_worker = CoincidencesWorker(
+            channels=channels,
+            user_name=self.login_username,
+            binwidth=binwidth,
+            auth_token=self.auth_token, is_mock=self.force_mock)
+        self.coinc_worker.newDataReady.connect(self.update_coincidences_plot)
+        self.coinc_worker.start()
+        
+        from PyQt6.QtWidgets import QStyle
+        self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+        self.coinc_btn_play_pause.setToolTip("Pause")
+        self.coinc_btn_reset.setEnabled(True)
+        self.tabs.setTabEnabled(0, False)
+
+    def pause_coincidences_measurement(self):
+        if self.coinc_worker:
+            self.coinc_worker.is_paused = not self.coinc_worker.is_paused
+            from PyQt6.QtWidgets import QStyle
+            if self.coinc_worker.is_paused:
+                self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+                self.coinc_btn_play_pause.setToolTip("Resume")
+            else:
+                self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+                self.coinc_btn_play_pause.setToolTip("Pause")
+
+    def reset_coincidences_measurement(self):
+        if self.coinc_worker:
+            self.coinc_worker.stop()
+            self.old_workers.append(self.coinc_worker)
+            self.coinc_worker = None
+            
+        self.coinc_plot_widget.clear()
+        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+        from PyQt6.QtWidgets import QStyle
+        self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.coinc_btn_play_pause.setToolTip("Start")
+        self.coinc_btn_reset.setEnabled(False)
+        self.tabs.setTabEnabled(0, True)
+
+    def update_coincidences_plot(self, data):
+        import numpy as np
+        if not hasattr(self, 'coinc_ydata'):
+            self.coinc_ydata = []
+        self.coinc_ydata.append(np.sum(data))
+        
+        if len(self.coinc_ydata) > 100:
+            self.coinc_ydata = self.coinc_ydata[-100:]
+            
+        self.coinc_plot_curve.setData(self.coinc_ydata)
+
     def build_histogram_tab(self):
         self.histogram_tab = QWidget()
         layout = QVBoxLayout(self.histogram_tab)
@@ -773,6 +950,12 @@ class MainWindow(QMainWindow):
         self.hist_btn_export.setToolTip("Export Data")
         self.hist_btn_export.setEnabled(False)
         self.hist_btn_export.clicked.connect(self.export_histogram_data)
+        
+        self.hist_btn_filter = QPushButton("Filter")
+        self.hist_btn_filter.setCheckable(True)
+        self.hist_btn_filter.setToolTip("Toggle filter region")
+        self.hist_btn_filter.clicked.connect(self.toggle_hist_filter)
+        self.hist_btn_filter.hide()
         
         self.hist_mode_combo = QComboBox()
         self.hist_mode_combo.addItems(["Start-Stop", "Histogram", "Correlation"])
@@ -805,6 +988,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.hist_btn_zoom)
         controls.addWidget(self.hist_btn_auto_range)
         controls.addWidget(self.hist_btn_export)
+        controls.addWidget(self.hist_btn_filter)
         
         controls.addSpacing(20)
         controls.addWidget(QLabel("Mode:"))
@@ -835,7 +1019,26 @@ class MainWindow(QMainWindow):
         
         self.hist_plot_curve = None
         
+        self.hist_region = pg.LinearRegionItem(brush=(255, 255, 0, 50))
+        self.hist_region.setZValue(10)
+        self.hist_region.hide()
+        self.hist_plot_widget.addItem(self.hist_region)
+
+        self.hist_filter_plot_widget = pg.PlotWidget()
+        self.hist_filter_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self.hist_filter_plot_widget.setLabel('bottom', 'Time (s)')
+        self.hist_filter_plot_widget.setLabel('left', 'Sum in Filter')
+        self.hist_filter_plot_widget.hide()
+        self.hist_filter_curve = self.hist_filter_plot_widget.plot(pen='y')
+        
+        self.hist_filter_ydata = []
+        self.hist_filter_xdata = []
+        
         layout.addWidget(self.hist_plot_widget)
+        layout.addWidget(self.hist_filter_plot_widget)
+        
+        layout.setStretchFactor(self.hist_plot_widget, 3)
+        layout.setStretchFactor(self.hist_filter_plot_widget, 1)
         
         self.hist_worker = None
         
@@ -1037,7 +1240,7 @@ class MainWindow(QMainWindow):
                 else:
                     self.plot_widget.setLabel('left', f'Counts / {binwidth}ps')
             
-            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, refresh_rate, mode=mode, auth_token=self.auth_token)
+            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, refresh_rate, mode=mode, auth_token=self.auth_token, is_mock=self.force_mock)
             self.worker.finished.connect(self.on_worker_finished)
             
             if self.worker.booking_error:
@@ -1190,6 +1393,9 @@ class MainWindow(QMainWindow):
         if self.hist_worker is None:
             self.hist_plot_widget.clear()
             self.hist_plot_curve = self.hist_plot_widget.plot(pen='b')
+            self.hist_plot_widget.addItem(self.hist_region)
+            if not self.hist_btn_filter.isChecked():
+                self.hist_region.hide()
             self.hist_data_buffer = np.zeros(n_values)
             self.hist_x_buffer = np.zeros(n_values)
 
@@ -1202,7 +1408,8 @@ class MainWindow(QMainWindow):
             user_name=user_name,
             binwidth=binwidth,
             n_values=n_values,
-            mode=mode
+            mode=mode,
+            is_mock=self.force_mock
         )
 
         if self.hist_worker.booking_error:
@@ -1228,6 +1435,28 @@ class MainWindow(QMainWindow):
         self.tabs.setTabEnabled(0, False)
         self.tabs.setTabEnabled(1, False)
         
+    def toggle_hist_filter(self):
+        if self.hist_btn_filter.isChecked():
+            self.hist_region.show()
+            self.hist_filter_plot_widget.show()
+            self.hist_filter_ydata = []
+            self.hist_filter_xdata = []
+            self.hist_filter_curve.setData([], [])
+            
+            import time
+            self.hist_filter_start_time = time.time()
+            
+            if hasattr(self, 'hist_x_buffer') and self.hist_x_buffer is not None and len(self.hist_x_buffer) > 0:
+                mid = len(self.hist_x_buffer) // 2
+                span = (self.hist_x_buffer[-1] - self.hist_x_buffer[0]) * 0.1
+                if span == 0: span = 1
+                self.hist_region.setRegion([self.hist_x_buffer[mid] - span, self.hist_x_buffer[mid] + span])
+            else:
+                self.hist_region_needs_init = True
+        else:
+            self.hist_region.hide()
+            self.hist_filter_plot_widget.hide()
+
     def update_histogram_plot(self, x_data, y_data):
         if self.hist_plot_curve:
             try:
@@ -1245,6 +1474,43 @@ class MainWindow(QMainWindow):
                     self.hist_plot_curve.setData([], [])
                 else:
                     self.hist_plot_curve.setData(self.hist_x_buffer, self.hist_data_buffer)
+                    
+                    if hasattr(self, 'hist_btn_filter') and self.hist_btn_filter.isChecked():
+                        if getattr(self, 'hist_region_needs_init', False) and len(self.hist_x_buffer) > 0:
+                            mid = len(self.hist_x_buffer) // 2
+                            span = (self.hist_x_buffer[-1] - self.hist_x_buffer[0]) * 0.1
+                            if span == 0: span = 1
+                            self.hist_region.setRegion([self.hist_x_buffer[mid] - span, self.hist_x_buffer[mid] + span])
+                            self.hist_region_needs_init = False
+                            
+                        minX, maxX = self.hist_region.getRegion()
+                        mask = (self.hist_x_buffer >= minX) & (self.hist_x_buffer <= maxX)
+                        sum_val = np.sum(self.hist_data_buffer[mask])
+                        
+                        import time
+                        if not hasattr(self, 'hist_filter_start_time'):
+                            self.hist_filter_start_time = time.time()
+                            
+                        elapsed = time.time() - self.hist_filter_start_time
+                        
+                        self.hist_filter_ydata.append(sum_val)
+                        self.hist_filter_xdata.append(elapsed)
+                        
+                        if len(self.hist_filter_ydata) > 10000:
+                            self.hist_filter_ydata = self.hist_filter_ydata[-10000:]
+                            self.hist_filter_xdata = self.hist_filter_xdata[-10000:]
+                            
+                        view_x_range = self.hist_filter_plot_widget.viewRange()[0]
+                        current_window = view_x_range[1] - view_x_range[0]
+                        if current_window < 1 or current_window > 100000:
+                            current_window = 60
+                            
+                        if elapsed > current_window:
+                            self.hist_filter_plot_widget.setXRange(elapsed - current_window, elapsed, padding=0)
+                        else:
+                            self.hist_filter_plot_widget.setXRange(0, current_window, padding=0)
+                            
+                        self.hist_filter_curve.setData(self.hist_filter_xdata, self.hist_filter_ydata)
             except Exception as e:
                 logger.error(f"Error plotting histogram: {e}")
 
@@ -1289,6 +1555,9 @@ class MainWindow(QMainWindow):
             self.hist_n_values_input.setEnabled(True)
             if hasattr(self, 'lbl_hist_bins'):
                 self.lbl_hist_bins.setEnabled(True)
+                
+        if hasattr(self, 'hist_btn_filter'):
+            self.hist_btn_filter.show()
 
     def quick_restart_histogram(self):
         if self.hist_worker:
@@ -1302,6 +1571,9 @@ class MainWindow(QMainWindow):
             self.hist_worker = None
             
         self.hist_plot_widget.clear()
+        self.hist_plot_widget.addItem(self.hist_region)
+        if not self.hist_btn_filter.isChecked():
+            self.hist_region.hide()
         self.hist_plot_curve = None
         self.hist_data_buffer = None
         self.hist_x_buffer = None
