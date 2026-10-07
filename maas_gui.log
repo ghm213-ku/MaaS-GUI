@@ -1326,3 +1326,25 @@
 2026-10-07 14:18:38,497 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1c39e3d0980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
 2026-10-07 14:18:52,530 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
 2026-10-07 14:19:11,861 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 14:22:59,399 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 14:23:03,561 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x12533320980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 14:23:12,096 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 14:23:19,375 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 14:27:30,921 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 14:27:35,031 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x16360650980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 14:28:01,393 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 14:28:24,136 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Histogram
+2026-10-07 14:28:35,118 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 14:31:03,815 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 14:31:07,711 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x1bf12680980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 14:31:13,881 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 14:31:28,753 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Histogram
+2026-10-07 14:32:10,096 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Histogram
+2026-10-07 14:32:13,080 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 14:36:00,557 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 14:36:04,712 [ERROR] ui.main_window: Failed to fetch booked channels: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/channels (Caused by ConnectTimeoutError(<HTTPConnection(host='127.0.0.1', port=8000) at 0x14fc4010980>, 'Connection to 127.0.0.1 timed out. (connect timeout=2)'))
+2026-10-07 14:36:24,686 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 14:37:44,561 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
+2026-10-07 14:40:57,654 [INFO] __main__: Starting MaaS GUI Application
+2026-10-07 14:41:08,727 [INFO] hardware.histogram_worker: Running mock HistogramWorker in mode: Start-Stop
+2026-10-07 14:41:49,117 [INFO] ui.main_window: Application is closing. Tearing down hardware and measurements...
