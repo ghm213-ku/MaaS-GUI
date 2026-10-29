@@ -7,7 +7,12 @@ Welcome to the Measurement as a Service (MaaS) Graphical User Interface! This ap
 ### 1. Account & Connection
 When you launch the application, you'll start on the **Account** tab.
 - Enter your **Username** and **Password**.
-- Click **Connect** to authenticate with the backend server.
+- Click **Login** to authenticate with the backend server. The application receives a JWT token and decodes it to determine your assigned role.
+- **Account Password Update**: You can change your password anytime under the **Account** tab by providing your current password and entering a new password.
+- **Admin Users ("User Management" tab)**: If the decoded token identifies you as an **Admin**, a dedicated **User Management** tab is unlocked. This unified panel contains a dropdown allowing the administrator to switch between three actions:
+  - **Add User**: Register new user accounts in MaaS (selecting either **Operator** or **Viewer** role). Initial password defaults to the username.
+  - **Delete User**: Permanently remove user accounts from the MaaS platform with confirmation safeguards (self-deletion of the active admin account is prohibited).
+  - **Change User Password**: Directly set a new password for any existing user account on the platform without requiring their current password.
 - *(Note: If you are running the app in testing mode, authentication will be bypassed.)*
 
 ### 2. Channels Setup
@@ -48,10 +53,13 @@ The Histograms tab allows you to measure the time differences between events on 
   - The bottom plot tracks how many counts fall within your filter(s) over time.
 
 ### Coincidences Tab
-The Coincidences tab measures simultaneous events (coincidences) across pairs of channels within a specific coincidence window.
+The Coincidences tab measures simultaneous events (coincidences) across channels within a specific coincidence window.
 
-- Set the **Coincidence Window (ps)** to define how close two events must be to be considered simultaneous.
-- The plot visualizes the coincidence rates between all combinations of your booked channels.
+- Set the **Coincidence Window (ps)** to define how close two events must be to be considered simultaneous (default: 1000 ps = 1 ns).
+- Enter comma-separated channel numbers in each box (e.g. `"1, 2"` or `"1, 2, 3"`).
+- By default, 1 box is open. Use the **`+`** icon to add additional coincidence group boxes for concurrent multi-group measurements, and **`-`** to remove them.
+- **Validation**: When starting a measurement, the application validates that input formats are correct and that all entered channels correspond to channels chosen in the initial Channels Setup tab.
+- **Individual Data Streams & Plotting**: Each coincidence channel group has an individual data stream with its own color-coded plot curve and legend entry, visualizing simultaneous events across all specified groups concurrently.
 
 ---
 

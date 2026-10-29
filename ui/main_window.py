@@ -1,6 +1,7 @@
 import numpy as np
 import requests
 import json
+import base64
 import logging
 
 logger = logging.getLogger(__name__)
@@ -261,6 +262,9 @@ class MainWindow(QMainWindow):
         
         self.auth_token = ""
         self.login_username = ""
+        self.user_role = ""
+        self.jwt_payload = {}
+        self.add_user_tab = None
         
         self.setWindowTitle("Swabian Count Rate Monitor")
         self.resize(250, 180)
@@ -361,6 +365,474 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.login_password_input, alignment=Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(self.btn_login, alignment=Qt.AlignmentFlag.AlignHCenter)
 
+    def decode_jwt_token(self, token: str) -> dict:
+        if not token or not isinstance(token, str):
+            return {}
+        try:
+            clean_token = token.strip().strip('"').strip("'")
+            parts = clean_token.split(".")
+            if len(parts) >= 2:
+                payload_b64 = parts[1]
+                padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+                decoded_bytes = base64.urlsafe_b64decode(padded)
+                return json.loads(decoded_bytes.decode("utf-8"))
+        except Exception as e:
+            logger.debug(f"Failed to decode JWT token: {e}")
+        return {}
+
+    def update_admin_tab_visibility(self):
+        user_mgmt_tab_index = -1
+        tabs_to_remove = []
+        for i in range(self.tabs.count()):
+            text = self.tabs.tabText(i).strip().lower()
+            if text in ["user management", "add user", "delete user"]:
+                if user_mgmt_tab_index == -1 and text == "user management":
+                    user_mgmt_tab_index = i
+                else:
+                    tabs_to_remove.append(i)
+
+        # Remove any legacy or duplicate tabs
+        for idx in sorted(tabs_to_remove, reverse=True):
+            self.tabs.removeTab(idx)
+
+        is_admin = getattr(self, 'user_role', '').lower() == "admin"
+        if is_admin:
+            if user_mgmt_tab_index == -1:
+                if not hasattr(self, 'user_mgmt_tab') or self.user_mgmt_tab is None:
+                    self.build_user_management_tab()
+                self.tabs.addTab(self.user_mgmt_tab, "User Management")
+        else:
+            if user_mgmt_tab_index != -1:
+                self.tabs.removeTab(user_mgmt_tab_index)
+
+    def build_user_management_tab(self):
+        self.user_mgmt_tab = QWidget()
+        self.user_management_tab = self.user_mgmt_tab
+        self.add_user_tab = self.user_mgmt_tab
+        self.delete_user_tab = self.user_mgmt_tab
+
+        main_layout = QVBoxLayout(self.user_mgmt_tab)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        main_layout.setContentsMargins(40, 30, 40, 30)
+        main_layout.setSpacing(16)
+
+        title = QLabel("User Management")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 2px;")
+        main_layout.addWidget(title)
+
+        subtitle = QLabel("Administrator portal to register new users, delete existing accounts, or reset user passwords.")
+        subtitle.setStyleSheet("color: #666666; font-size: 12px; margin-bottom: 8px;")
+        main_layout.addWidget(subtitle)
+
+        # Dropdown selection for operation
+        action_layout = QHBoxLayout()
+        action_label = QLabel("Select Operation:")
+        action_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        action_layout.addWidget(action_label)
+
+        self.user_mgmt_action_combo = QComboBox()
+        self.user_mgmt_action_combo.setFixedWidth(240)
+        self.user_mgmt_action_combo.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; font-weight: 500;")
+        self.user_mgmt_action_combo.addItem("Add User")
+        self.user_mgmt_action_combo.addItem("Delete User")
+        self.user_mgmt_action_combo.addItem("Change User Password")
+        action_layout.addWidget(self.user_mgmt_action_combo)
+        action_layout.addStretch()
+        main_layout.addLayout(action_layout)
+
+        # Separator line
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        sep.setStyleSheet("color: #e0e0e0; margin-top: 4px; margin-bottom: 4px;")
+        main_layout.addWidget(sep)
+
+        # Stacked widget for the 3 operations
+        self.user_mgmt_stack = QStackedWidget()
+        main_layout.addWidget(self.user_mgmt_stack)
+
+        # ---- 1. Add User Widget ----
+        self.add_user_widget = QWidget()
+        add_layout = QVBoxLayout(self.add_user_widget)
+        add_layout.setContentsMargins(0, 8, 0, 0)
+        add_layout.setSpacing(12)
+
+        add_desc = QLabel("Register a new user in MaaS. The initial password defaults to the username.")
+        add_desc.setStyleSheet("color: #555555; font-size: 12px;")
+        add_layout.addWidget(add_desc)
+
+        add_form = QFormLayout()
+        add_form.setSpacing(14)
+
+        self.new_user_username_input = QLineEdit()
+        self.new_user_username_input.setPlaceholderText("Enter username")
+        self.new_user_username_input.setFixedWidth(240)
+        self.new_user_username_input.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;")
+        add_form.addRow("Username:", self.new_user_username_input)
+
+        self.new_user_role_combo = QComboBox()
+        self.new_user_role_combo.setFixedWidth(240)
+        self.new_user_role_combo.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;")
+        self.user_types = ["Operator", "Viewer"]
+        self.role_id_map = {
+            "Operator": 2,
+            "Viewer": 3,
+            "Admin": 1,
+            "operator": 2,
+            "viewer": 3,
+            "admin": 1
+        }
+        self.new_user_role_combo.addItem("Operator", 2)
+        self.new_user_role_combo.addItem("Viewer", 3)
+        self.new_user_role_combo.addItem("Admin", 1)
+        add_form.addRow("User Type:", self.new_user_role_combo)
+        add_layout.addLayout(add_form)
+
+        self.btn_create_user = QPushButton("Add User")
+        self.btn_add_user = self.btn_create_user  # Alias
+        self.btn_create_user.setFixedWidth(240)
+        self.btn_create_user.setStyleSheet(
+            "QPushButton { background-color: #111111; color: white; padding: 8px; font-weight: bold; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #333333; }"
+        )
+        self.btn_create_user.clicked.connect(self.submit_add_user)
+        self.new_user_username_input.returnPressed.connect(self.submit_add_user)
+        add_layout.addWidget(self.btn_create_user)
+
+        self.add_user_status_label = QLabel("")
+        self.add_user_status_label.setStyleSheet("font-size: 13px; font-weight: 500; margin-top: 4px;")
+        add_layout.addWidget(self.add_user_status_label)
+        add_layout.addStretch()
+
+        self.user_mgmt_stack.addWidget(self.add_user_widget)
+
+        # ---- 2. Delete User Widget ----
+        self.delete_user_widget = QWidget()
+        del_layout = QVBoxLayout(self.delete_user_widget)
+        del_layout.setContentsMargins(0, 8, 0, 0)
+        del_layout.setSpacing(12)
+
+        del_desc = QLabel("Permanently delete an existing user account from MaaS.")
+        del_desc.setStyleSheet("color: #555555; font-size: 12px;")
+        del_layout.addWidget(del_desc)
+
+        del_form = QFormLayout()
+        del_form.setSpacing(14)
+
+        self.delete_user_username_input = QLineEdit()
+        self.delete_user_username_input.setPlaceholderText("Enter username to delete")
+        self.delete_user_username_input.setFixedWidth(240)
+        self.delete_user_username_input.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;")
+        del_form.addRow("Username:", self.delete_user_username_input)
+        del_layout.addLayout(del_form)
+
+        self.btn_delete_user = QPushButton("Delete User")
+        self.btn_remove_user = self.btn_delete_user  # Alias
+        self.btn_delete_user.setFixedWidth(240)
+        self.btn_delete_user.setStyleSheet(
+            "QPushButton { background-color: #d32f2f; color: white; padding: 8px; font-weight: bold; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #b71c1c; }"
+        )
+        self.btn_delete_user.clicked.connect(self.submit_delete_user)
+        self.delete_user_username_input.returnPressed.connect(self.submit_delete_user)
+        del_layout.addWidget(self.btn_delete_user)
+
+        self.delete_user_status_label = QLabel("")
+        self.delete_user_status_label.setStyleSheet("font-size: 13px; font-weight: 500; margin-top: 4px;")
+        del_layout.addWidget(self.delete_user_status_label)
+        del_layout.addStretch()
+
+        self.user_mgmt_stack.addWidget(self.delete_user_widget)
+
+        # ---- 3. Change User Password Widget ----
+        self.reset_pwd_widget = QWidget()
+        pwd_layout = QVBoxLayout(self.reset_pwd_widget)
+        pwd_layout.setContentsMargins(0, 8, 0, 0)
+        pwd_layout.setSpacing(12)
+
+        pwd_desc = QLabel("Reset password for any user account without needing their current password.")
+        pwd_desc.setStyleSheet("color: #555555; font-size: 12px;")
+        pwd_layout.addWidget(pwd_desc)
+
+        pwd_form = QFormLayout()
+        pwd_form.setSpacing(14)
+
+        self.reset_pwd_username_input = QLineEdit()
+        self.reset_pwd_username_input.setPlaceholderText("Enter username to update")
+        self.reset_pwd_username_input.setFixedWidth(240)
+        self.reset_pwd_username_input.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;")
+        pwd_form.addRow("Username:", self.reset_pwd_username_input)
+
+        self.reset_pwd_new_password_input = QLineEdit()
+        self.reset_pwd_new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.reset_pwd_new_password_input.setPlaceholderText("Enter new password")
+        self.reset_pwd_new_password_input.setFixedWidth(240)
+        self.reset_pwd_new_password_input.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;")
+        pwd_form.addRow("New Password:", self.reset_pwd_new_password_input)
+
+        self.reset_pwd_confirm_password_input = QLineEdit()
+        self.reset_pwd_confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.reset_pwd_confirm_password_input.setPlaceholderText("Confirm new password")
+        self.reset_pwd_confirm_password_input.setFixedWidth(240)
+        self.reset_pwd_confirm_password_input.setStyleSheet("padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;")
+        pwd_form.addRow("Confirm Password:", self.reset_pwd_confirm_password_input)
+
+        pwd_layout.addLayout(pwd_form)
+
+        self.btn_reset_user_password = QPushButton("Change Password")
+        self.btn_reset_password = self.btn_reset_user_password  # Alias
+        self.btn_reset_user_password.setFixedWidth(240)
+        self.btn_reset_user_password.setStyleSheet(
+            "QPushButton { background-color: #111111; color: white; padding: 8px; font-weight: bold; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #333333; }"
+        )
+        self.btn_reset_user_password.clicked.connect(self.submit_reset_password)
+        self.reset_pwd_confirm_password_input.returnPressed.connect(self.submit_reset_password)
+        pwd_layout.addWidget(self.btn_reset_user_password)
+
+        self.reset_pwd_status_label = QLabel("")
+        self.reset_pwd_status_label.setStyleSheet("font-size: 13px; font-weight: 500; margin-top: 4px;")
+        pwd_layout.addWidget(self.reset_pwd_status_label)
+        pwd_layout.addStretch()
+
+        self.user_mgmt_stack.addWidget(self.reset_pwd_widget)
+
+        # Connect action switcher
+        self.user_mgmt_action_combo.currentIndexChanged.connect(self.on_user_mgmt_action_changed)
+
+    def on_user_mgmt_action_changed(self, index):
+        self.user_mgmt_stack.setCurrentIndex(index)
+
+    def build_add_user_tab(self):
+        """Backward compatibility helper."""
+        self.build_user_management_tab()
+        self.user_mgmt_action_combo.setCurrentIndex(0)
+
+    def build_delete_user_tab(self):
+        """Backward compatibility helper."""
+        self.build_user_management_tab()
+        self.user_mgmt_action_combo.setCurrentIndex(1)
+
+    def submit_add_user(self):
+        username = self.new_user_username_input.text().strip()
+        if not username:
+            QMessageBox.warning(self, "Invalid Input", "Username cannot be empty.")
+            return
+
+        role_name = self.new_user_role_combo.currentText()
+        role_id = self.new_user_role_combo.currentData()
+        if role_id is None:
+            role_id = self.role_id_map.get(role_name, 2)
+
+        if getattr(self, 'force_mock', False):
+            QMessageBox.information(self, "Success", f"User '{username}' with role '{role_name}' created successfully.")
+            self.new_user_username_input.clear()
+            self.add_user_status_label.setText(f"User '{username}' ({role_name}) created successfully.")
+            self.add_user_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
+            return
+
+        try:
+            import requests
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            payload = {"username": username, "role_id": int(role_id)}
+            resp = self.session.post("http://127.0.0.1:8000/auth/users", json=payload, headers=headers, timeout=5)
+
+            if resp.status_code == 201:
+                QMessageBox.information(self, "Success", f"User '{username}' with role '{role_name}' created successfully.")
+                self.new_user_username_input.clear()
+                self.add_user_status_label.setText(f"User '{username}' ({role_name}) created successfully.")
+                self.add_user_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
+            elif resp.status_code == 400:
+                detail = resp.json().get("detail", "Username already exists or invalid role")
+                QMessageBox.warning(self, "Failed", detail)
+                self.add_user_status_label.setText(f"Failed: {detail}")
+                self.add_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            elif resp.status_code == 403:
+                detail = resp.json().get("detail", "Admin privileges required")
+                QMessageBox.warning(self, "Permission Denied", detail)
+                self.add_user_status_label.setText(f"Permission Denied: {detail}")
+                self.add_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            else:
+                resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Connection Error", f"Could not connect to MaaS backend:\n{e}")
+            self.add_user_status_label.setText("Connection error with backend.")
+            self.add_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error creating user:\n{e}")
+            self.add_user_status_label.setText(f"Error: {e}")
+            self.add_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+
+    def add_user(self):
+        """Alias for submit_add_user."""
+        self.submit_add_user()
+
+    def submit_delete_user(self):
+        username = self.delete_user_username_input.text().strip()
+        if not username:
+            QMessageBox.warning(self, "Invalid Input", "Username cannot be empty.")
+            return
+
+        if hasattr(self, 'login_username') and self.login_username and username.lower() == self.login_username.lower():
+            QMessageBox.warning(self, "Action Prohibited", "You cannot delete your own admin account.")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Confirm Deletion",
+            f"Are you sure you want to delete user '{username}'?\nThis action cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        if getattr(self, 'force_mock', False):
+            QMessageBox.information(self, "Success", f"User '{username}' deleted successfully.")
+            self.delete_user_username_input.clear()
+            self.delete_user_status_label.setText(f"User '{username}' deleted successfully.")
+            self.delete_user_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
+            return
+
+        try:
+            import requests
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            resp = self.session.delete(f"http://127.0.0.1:8000/auth/users/{username}", headers=headers, timeout=5)
+
+            if resp.status_code == 200:
+                QMessageBox.information(self, "Success", f"User '{username}' deleted successfully.")
+                self.delete_user_username_input.clear()
+                self.delete_user_status_label.setText(f"User '{username}' deleted successfully.")
+                self.delete_user_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
+            elif resp.status_code == 404:
+                try:
+                    detail = resp.json().get("detail", f"User '{username}' not found")
+                except Exception:
+                    detail = f"User '{username}' not found"
+                QMessageBox.warning(self, "Not Found", detail)
+                self.delete_user_status_label.setText(f"Failed: {detail}")
+                self.delete_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            elif resp.status_code == 400:
+                try:
+                    detail = resp.json().get("detail", "Cannot delete user")
+                except Exception:
+                    detail = "Cannot delete user"
+                QMessageBox.warning(self, "Failed", detail)
+                self.delete_user_status_label.setText(f"Failed: {detail}")
+                self.delete_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            elif resp.status_code == 403:
+                try:
+                    detail = resp.json().get("detail", "Admin privileges required")
+                except Exception:
+                    detail = "Admin privileges required"
+                QMessageBox.warning(self, "Permission Denied", detail)
+                self.delete_user_status_label.setText(f"Permission Denied: {detail}")
+                self.delete_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            else:
+                resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Connection Error", f"Could not connect to MaaS backend:\n{e}")
+            self.delete_user_status_label.setText("Connection error with backend.")
+            self.delete_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error deleting user:\n{e}")
+            self.delete_user_status_label.setText(f"Error: {e}")
+            self.delete_user_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+
+    def delete_user(self):
+        """Alias for submit_delete_user."""
+        self.submit_delete_user()
+
+    def submit_reset_password(self):
+        username = self.reset_pwd_username_input.text().strip()
+        new_pwd = self.reset_pwd_new_password_input.text()
+        conf_pwd = self.reset_pwd_confirm_password_input.text()
+
+        if not username:
+            QMessageBox.warning(self, "Invalid Input", "Username cannot be empty.")
+            return
+
+        if not new_pwd or not conf_pwd:
+            QMessageBox.warning(self, "Invalid Input", "Password fields cannot be empty.")
+            return
+
+        if new_pwd != conf_pwd:
+            QMessageBox.warning(self, "Invalid Input", "New passwords do not match.")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Confirm Password Change",
+            f"Are you sure you want to change the password for user '{username}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        if getattr(self, 'force_mock', False):
+            QMessageBox.information(self, "Success", f"Password for user '{username}' changed successfully.")
+            self.reset_pwd_username_input.clear()
+            self.reset_pwd_new_password_input.clear()
+            self.reset_pwd_confirm_password_input.clear()
+            self.reset_pwd_status_label.setText(f"Password for user '{username}' changed successfully.")
+            self.reset_pwd_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
+            return
+
+        try:
+            import requests
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            payload = {"new_password": new_pwd}
+            resp = self.session.put(f"http://127.0.0.1:8000/auth/users/{username}/password", json=payload, headers=headers, timeout=5)
+
+            if resp.status_code == 200:
+                QMessageBox.information(self, "Success", f"Password for user '{username}' changed successfully.")
+                self.reset_pwd_username_input.clear()
+                self.reset_pwd_new_password_input.clear()
+                self.reset_pwd_confirm_password_input.clear()
+                self.reset_pwd_status_label.setText(f"Password for user '{username}' changed successfully.")
+                self.reset_pwd_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
+            elif resp.status_code == 404:
+                try:
+                    detail = resp.json().get("detail", f"User '{username}' not found")
+                except Exception:
+                    detail = f"User '{username}' not found"
+                QMessageBox.warning(self, "Not Found", detail)
+                self.reset_pwd_status_label.setText(f"Failed: {detail}")
+                self.reset_pwd_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            elif resp.status_code == 403:
+                try:
+                    detail = resp.json().get("detail", "Admin privileges required")
+                except Exception:
+                    detail = "Admin privileges required"
+                QMessageBox.warning(self, "Permission Denied", detail)
+                self.reset_pwd_status_label.setText(f"Permission Denied: {detail}")
+                self.reset_pwd_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+            else:
+                try:
+                    detail = resp.json().get("detail", resp.text)
+                except Exception:
+                    detail = resp.text
+                QMessageBox.warning(self, "Failed", f"Failed to change password: {detail}")
+                self.reset_pwd_status_label.setText(f"Failed: {detail}")
+                self.reset_pwd_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Connection Error", f"Could not connect to MaaS backend:\n{e}")
+            self.reset_pwd_status_label.setText("Connection error with backend.")
+            self.reset_pwd_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error changing password:\n{e}")
+            self.reset_pwd_status_label.setText(f"Error: {e}")
+            self.reset_pwd_status_label.setStyleSheet("color: #cc0000; font-size: 13px;")
+
+    def reset_user_password(self):
+        """Alias for submit_reset_password."""
+        self.submit_reset_password()
+
+    def change_user_password(self):
+        """Alias for submit_reset_password."""
+        self.submit_reset_password()
+
     def authenticate(self):
         username = self.login_username_input.text().strip()
         password = self.login_password_input.text().strip()
@@ -369,7 +841,10 @@ class MainWindow(QMainWindow):
             return
             
         if getattr(self, 'force_mock', False):
-            self.auth_token = "mock_token"
+            role = "admin" if username.lower() == "admin" else "operator"
+            payload_str = json.dumps({"sub": 1, "role": role})
+            b64_payload = base64.urlsafe_b64encode(payload_str.encode()).decode().rstrip("=")
+            self.auth_token = f"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.{b64_payload}.mock_sig"
             self.login_username = username
         else:
             try:
@@ -386,6 +861,14 @@ class MainWindow(QMainWindow):
                 return
             
         self.session.headers.update({"Authorization": f"Bearer {self.auth_token}"})
+
+        # Decode JWT token to check user role and determine if admin
+        self.jwt_payload = self.decode_jwt_token(self.auth_token)
+        self.user_role = str(self.jwt_payload.get("role", "")).lower()
+        if getattr(self, 'force_mock', False) and username.lower() == "admin":
+            self.user_role = "admin"
+
+        self.update_admin_tab_visibility()
         
         # Set the fixed username
         self.user_name_input.setText(self.login_username)
@@ -489,9 +972,16 @@ class MainWindow(QMainWindow):
         if new_pwd != conf_pwd:
             QMessageBox.warning(self, "Error", "New passwords do not match.")
             return
+
+        if getattr(self, 'force_mock', False):
+            QMessageBox.information(self, "Success", "Password updated successfully.")
+            self.old_password_input.clear()
+            self.new_password_input.clear()
+            self.confirm_password_input.clear()
+            return
             
         try:
-            resp = self.session.post("http://127.0.0.1:8000/auth/change-password", 
+            resp = self.session.put("http://127.0.0.1:8000/auth/password", 
                 json={"old_password": old_pwd, "new_password": new_pwd}, timeout=5)
             
             if resp.status_code == 200:
@@ -500,7 +990,11 @@ class MainWindow(QMainWindow):
                 self.new_password_input.clear()
                 self.confirm_password_input.clear()
             else:
-                QMessageBox.warning(self, "Error", f"Failed to update password: {resp.text}")
+                try:
+                    err_msg = resp.json().get("detail", resp.text)
+                except Exception:
+                    err_msg = resp.text
+                QMessageBox.warning(self, "Error", f"Failed to update password: {err_msg}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Connection error: {e}")
 
@@ -832,26 +1326,30 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.coinc_btn_reset)
         
         controls.addSpacing(20)
-        controls.addWidget(QLabel("Bin width (ps):"))
+        controls.addWidget(QLabel("Coincidence Window (ps):"))
         self.coinc_binwidth_input = QLineEdit("1000")
         self.coinc_binwidth_input.setMaximumWidth(80)
+        self.coinc_binwidth_input.setToolTip("Coincidence window in picoseconds (default: 1000 ps = 1 ns)")
         controls.addWidget(self.coinc_binwidth_input)
         
         controls.addSpacing(20)
+        controls.addWidget(QLabel("Channels:"))
         self.coinc_channels_layout = QHBoxLayout()
-        self.coinc_combos = []
+        self.coinc_boxes = []
+        self.coinc_combos = self.coinc_boxes
         
-        # Initial 2 channels
-        self.add_coincidence_channel()
-        self.add_coincidence_channel()
+        # Initial 1 box by default
+        self.add_coincidence_box()
         
         self.coinc_btn_add = QPushButton("+")
         self.coinc_btn_add.setMaximumWidth(30)
-        self.coinc_btn_add.clicked.connect(self.add_coincidence_channel)
+        self.coinc_btn_add.setToolTip("Add coincidence channel group")
+        self.coinc_btn_add.clicked.connect(self.add_coincidence_box)
         
         self.coinc_btn_remove = QPushButton("-")
         self.coinc_btn_remove.setMaximumWidth(30)
-        self.coinc_btn_remove.clicked.connect(self.remove_coincidence_channel)
+        self.coinc_btn_remove.setToolTip("Remove last coincidence channel group")
+        self.coinc_btn_remove.clicked.connect(self.remove_coincidence_box)
         
         controls.addLayout(self.coinc_channels_layout)
         controls.addWidget(self.coinc_btn_add)
@@ -864,43 +1362,43 @@ class MainWindow(QMainWindow):
         self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self.coinc_plot_widget.setLabel('bottom', 'Time steps')
         self.coinc_plot_widget.setLabel('left', 'Coincidence Counts')
+        self.coinc_legend = self.coinc_plot_widget.addLegend(offset=(10, 10))
+        self.coinc_plot_curves = []
+        self.coinc_ydata_streams = []
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
         layout.addWidget(self.coinc_plot_widget)
         
         self.coinc_worker = None
 
-    def add_coincidence_channel(self):
-        max_channels = max(2, len(self.get_selected_channels()))
-        if len(self.coinc_combos) >= max_channels:
-            return
-            
-        combo = QComboBox()
-        combo.setFixedWidth(60)
-        self.coinc_combos.append(combo)
-        self.coinc_channels_layout.addWidget(combo)
+    def add_coincidence_box(self):
+        box = QLineEdit()
+        box.setMinimumWidth(80)
+        box.setMaximumWidth(140)
+        box.setPlaceholderText("e.g. 1, 2, 3")
+        box.setToolTip("Enter comma-separated channel numbers (e.g. '1, 2' or '1, 2, 3')")
+        self.coinc_boxes.append(box)
+        self.coinc_combos = self.coinc_boxes
+        self.coinc_channels_layout.addWidget(box)
         self.update_coincidences_channel_dropdowns()
 
+    def remove_coincidence_box(self):
+        if len(self.coinc_boxes) > 1:
+            box = self.coinc_boxes.pop()
+            self.coinc_combos = self.coinc_boxes
+            self.coinc_channels_layout.removeWidget(box)
+            box.deleteLater()
+
+    def add_coincidence_channel(self):
+        self.add_coincidence_box()
+
     def remove_coincidence_channel(self):
-        if len(self.coinc_combos) > 2:
-            combo = self.coinc_combos.pop()
-            self.coinc_channels_layout.removeWidget(combo)
-            combo.deleteLater()
+        self.remove_coincidence_box()
 
     def update_coincidences_channel_dropdowns(self):
         channels = self.get_selected_channels()
-        channels_str = [str(ch) for ch in channels]
-        
-        for i, combo in enumerate(self.coinc_combos):
-            curr = combo.currentText()
-            combo.clear()
-            if channels_str:
-                combo.addItems(channels_str)
-                if curr in channels_str:
-                    combo.setCurrentText(curr)
-                elif len(channels_str) > i:
-                    combo.setCurrentText(channels_str[i])
-                else:
-                    combo.setCurrentText(channels_str[0])
+        ch_str = ", ".join(str(c) for c in channels) if channels else "None"
+        for box in self.coinc_boxes:
+            box.setToolTip(f"Enter comma-separated channel numbers (e.g. '1, 2'). Chosen in setup: [{ch_str}]")
 
     def toggle_coincidences_play_pause(self):
         if self.coinc_worker is None:
@@ -909,32 +1407,138 @@ class MainWindow(QMainWindow):
             self.pause_coincidences_measurement()
 
     def start_coincidences_measurement(self):
-        channels = []
-        for combo in self.coinc_combos:
-            text = combo.currentText()
-            if text:
-                channels.append(int(text))
-        
-        if len(set(channels)) < 2:
-            QMessageBox.warning(self, "Invalid Selection", "At least two unique channels must be selected.")
+        selected_channels = self.get_selected_channels()
+        if not selected_channels:
+            QMessageBox.warning(
+                self,
+                "No Channels Selected",
+                "No channels were selected in the Channels Setup tab. Please select and activate channels first."
+            )
             return
-            
+
         try:
-            binwidth = int(self.coinc_binwidth_input.text())
+            window_text = self.coinc_binwidth_input.text().strip()
+            window_ps = int(window_text)
+            if window_ps <= 0:
+                raise ValueError()
         except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Bin width must be an integer.")
+            QMessageBox.warning(
+                self,
+                "Invalid Input",
+                "Coincidence window must be a positive integer in picoseconds."
+            )
             return
+
+        if not self.coinc_boxes:
+            QMessageBox.warning(self, "Invalid Selection", "Please add at least one coincidence channel group.")
+            return
+
+        coincidences = []
+        for idx, box in enumerate(self.coinc_boxes):
+            raw_text = box.text().strip()
+            box_label = f"group #{idx + 1}" if len(self.coinc_boxes) > 1 else "the coincidence group"
+            
+            if not raw_text:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Format",
+                    f"Please enter comma-separated channels for {box_label} (e.g. '1, 2, 3')."
+                )
+                box.setFocus()
+                return
+
+            tokens = [t.strip() for t in raw_text.split(",")]
+            if any(not t for t in tokens):
+                QMessageBox.warning(
+                    self,
+                    "Invalid Format",
+                    f"Malformed channel list in {box_label}: '{raw_text}'. Channels must be separated by single commas without empty entries (e.g. '1, 2, 3')."
+                )
+                box.setFocus()
+                return
+
+            group_channels = []
+            for t in tokens:
+                try:
+                    ch = int(t)
+                    group_channels.append(ch)
+                except ValueError:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Format",
+                        f"Invalid channel value '{t}' in {box_label}. All channels must be integer numbers (e.g. '1, 2, 3')."
+                    )
+                    box.setFocus()
+                    return
+
+            if len(group_channels) < 2:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Selection",
+                    f"{box_label.capitalize()} must contain at least 2 channels (got {len(group_channels)}: '{raw_text}')."
+                )
+                box.setFocus()
+                return
+
+            if len(set(group_channels)) < len(group_channels):
+                QMessageBox.warning(
+                    self,
+                    "Invalid Selection",
+                    f"Duplicate channels detected in {box_label}: '{raw_text}'. Channels within a coincidence group must be distinct."
+                )
+                box.setFocus()
+                return
+
+            unselected = [ch for ch in group_channels if ch not in selected_channels]
+            if unselected:
+                unselected_str = ", ".join(str(ch) for ch in unselected)
+                available_str = ", ".join(str(ch) for ch in selected_channels)
+                QMessageBox.warning(
+                    self,
+                    "Channel Not Selected",
+                    f"Channel(s) [{unselected_str}] in {box_label} were not chosen in the initial Channels Setup.\n"
+                    f"Available chosen channels: [{available_str}]."
+                )
+                box.setFocus()
+                return
+
+            coincidences.append(group_channels)
 
         self.coinc_plot_widget.clear()
-        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+        if hasattr(self, 'coinc_legend') and self.coinc_legend is not None:
+            self.coinc_legend.clear()
+        else:
+            self.coinc_legend = self.coinc_plot_widget.addLegend(offset=(10, 10))
+
+        palette = ['#00ff00', '#00e5ff', '#ffaa00', '#ff00aa', '#ffff00', '#aa00ff', '#ff5500', '#00aaff']
+        self.coinc_plot_curves = []
+        self.coinc_ydata_streams = [[] for _ in coincidences]
+        self.coinc_groups = coincidences
+
+        for idx, group in enumerate(coincidences):
+            color = palette[idx % len(palette)]
+            pen = pg.mkPen(color=color, width=2)
+            label = f"Coinc {group}"
+            curve = self.coinc_plot_widget.plot(pen=pen, name=label)
+            self.coinc_plot_curves.append(curve)
+
+        self.coinc_plot_curve = self.coinc_plot_curves[0] if self.coinc_plot_curves else None
+        self.coinc_ydata = []
 
         self.coinc_worker = CoincidencesWorker(
-            channels=channels,
+            coincidences=coincidences,
             user_name=self.login_username,
-            binwidth=binwidth,
-            auth_token=self.auth_token, is_mock=self.force_mock)
+            coincidence_window=window_ps,
+            binwidth=int(1e9),
+            auth_token=self.auth_token,
+            is_mock=self.force_mock)
         self.coinc_worker.newDataReady.connect(self.update_coincidences_plot)
         self.coinc_worker.start()
+
+        if self.coinc_worker.booking_error:
+            QMessageBox.critical(self, "Booking Failed", self.coinc_worker.booking_error)
+            self.stop_coincidences_measurement()
+            return
         
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
@@ -972,7 +1576,12 @@ class MainWindow(QMainWindow):
             self.old_workers.append(self.coinc_worker)
             self.coinc_worker = None
             
+        self.coinc_ydata = []
+        self.coinc_ydata_streams = []
+        self.coinc_plot_curves = []
         self.coinc_plot_widget.clear()
+        if hasattr(self, 'coinc_legend') and self.coinc_legend is not None:
+            self.coinc_legend.clear()
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
@@ -983,14 +1592,53 @@ class MainWindow(QMainWindow):
 
     def update_coincidences_plot(self, data):
         import numpy as np
-        if not hasattr(self, 'coinc_ydata'):
-            self.coinc_ydata = []
-        self.coinc_ydata.append(np.sum(data))
-        
-        if len(self.coinc_ydata) > 100:
-            self.coinc_ydata = self.coinc_ydata[-100:]
-            
-        self.coinc_plot_curve.setData(self.coinc_ydata)
+        if not hasattr(self, 'coinc_plot_curves') or not self.coinc_plot_curves:
+            if not hasattr(self, 'coinc_ydata'):
+                self.coinc_ydata = []
+            self.coinc_ydata.append(float(np.sum(data)))
+            if len(self.coinc_ydata) > 100:
+                self.coinc_ydata = self.coinc_ydata[-100:]
+            if getattr(self, 'coinc_plot_curve', None):
+                self.coinc_plot_curve.setData(self.coinc_ydata)
+            return
+
+        if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
+            self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
+
+        arr = np.array(data, dtype=float)
+        if arr.ndim == 0:
+            arr = arr.reshape(1, 1)
+        elif arr.ndim == 1:
+            if arr.shape[0] == len(self.coinc_plot_curves):
+                arr = arr.reshape(-1, 1)
+            else:
+                arr = arr.reshape(1, -1)
+
+        for i in range(len(self.coinc_plot_curves)):
+            if i < arr.shape[0]:
+                row = arr[i]
+                val = float(np.sum(row))
+                self.coinc_ydata_streams[i].append(val)
+                if len(self.coinc_ydata_streams[i]) > 100:
+                    self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-100:]
+                self.coinc_plot_curves[i].setData(self.coinc_ydata_streams[i])
+
+        self.coinc_ydata = self.coinc_ydata_streams[0] if self.coinc_ydata_streams else []
+
+    def update_coincidences_stream_plot(self, stream_index, stream_data):
+        import numpy as np
+        if not hasattr(self, 'coinc_plot_curves') or stream_index >= len(self.coinc_plot_curves):
+            return
+        if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
+            self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
+
+        val = float(np.sum(stream_data))
+        self.coinc_ydata_streams[stream_index].append(val)
+        if len(self.coinc_ydata_streams[stream_index]) > 100:
+            self.coinc_ydata_streams[stream_index] = self.coinc_ydata_streams[stream_index][-100:]
+        self.coinc_plot_curves[stream_index].setData(self.coinc_ydata_streams[stream_index])
+        if stream_index == 0:
+            self.coinc_ydata = self.coinc_ydata_streams[0]
 
 
     def add_new_histogram_tab(self):

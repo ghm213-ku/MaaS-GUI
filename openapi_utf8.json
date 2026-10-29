@@ -6,6 +6,215 @@
     "version": "2.0"
   },
   "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/users": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create New User",
+        "operationId": "create_new_user_auth_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/users/{username}": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Delete Existing User",
+        "operationId": "delete_existing_user_auth_users__username__delete",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/users/{username}/password": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Admin Reset Password",
+        "operationId": "admin_reset_password_auth_users__username__password_put",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update Own Password",
+        "operationId": "update_own_password_auth_password_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/measurements/count-rate": {
       "post": {
         "tags": [
@@ -180,13 +389,265 @@
           "measurements"
         ],
         "summary": "Start Coincidences Measurement",
-        "description": "Start a new coincidences measurement request.\n\nReturns a unique measurement ID (status ID) to be used for status queries and stopping.\nThe job is enqueued for processing by the backend worker.\n\nAutomatically books the specified channels.",
+        "description": "Start a coincidences measurement.",
         "operationId": "start_coincidences_measurement_api_v1_measurements_coincidences_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CoincidencesMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/coincidence": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Coincidence Measurement",
+        "description": "Start a coincidence measurement (alias for /coincidences).",
+        "operationId": "start_coincidence_measurement_api_v1_measurements_coincidence_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoincidencesMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/coincidences-live": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Coincidences Live Measurement",
+        "description": "Start a live coincidences measurement.",
+        "operationId": "start_coincidences_live_measurement_api_v1_measurements_coincidences_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoincidencesLiveMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/coincidence-live": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Coincidence Live Measurement",
+        "description": "Start a live coincidence measurement (alias for /coincidences-live).",
+        "operationId": "start_coincidence_live_measurement_api_v1_measurements_coincidence_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoincidencesLiveMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/startstop-live": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Startstop Live Measurement",
+        "description": "Start a live startstop measurement streaming to Redis.",
+        "operationId": "start_startstop_live_measurement_api_v1_measurements_startstop_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartStopLiveMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/histogram-live": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Histogram Live Measurement",
+        "description": "Start a live histogram measurement streaming to Redis.",
+        "operationId": "start_histogram_live_measurement_api_v1_measurements_histogram_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistogramLiveMeasurementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/measurements/correlation-live": {
+      "post": {
+        "tags": [
+          "measurements"
+        ],
+        "summary": "Start Correlation Live Measurement",
+        "description": "Start a live correlation measurement streaming to Redis.",
+        "operationId": "start_correlation_live_measurement_api_v1_measurements_correlation_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrelationLiveMeasurementRequest"
               }
             }
           },
@@ -546,6 +1007,19 @@
   },
   "components": {
     "schemas": {
+      "AdminResetPasswordRequest": {
+        "properties": {
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_password"
+        ],
+        "title": "AdminResetPasswordRequest"
+      },
       "ChannelBookRequest": {
         "properties": {
           "user_name": {
@@ -764,6 +1238,45 @@
         "title": "ChannelStatsResponse",
         "description": "Response with channel statistics."
       },
+      "CoincidencesLiveMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "coincidences_live"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CoincidencesMetadata",
+            "description": "Metadata containing channels, binwidth, and n_values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "CoincidencesLiveMeasurementRequest",
+        "description": "Request model for live coincidences measurements.",
+        "example": {
+          "measurement_type": "coincidences_live",
+          "metadata": {
+            "binwidth": 1000000000,
+            "coincidence_window": 1000,
+            "coincidences": [
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                3,
+                5
+              ]
+            ],
+            "n_values": 1,
+            "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
+            "user_name": "abc-123-def"
+          }
+        }
+      },
       "CoincidencesMeasurementRequest": {
         "properties": {
           "measurement_type": {
@@ -792,10 +1305,17 @@
           "measurement_type": "coincidences",
           "metadata": {
             "binwidth": 1000000000,
-            "channels": [
-              1,
-              2,
-              3
+            "coincidence_window": 1000,
+            "coincidences": [
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                3,
+                5
+              ]
             ],
             "n_values": 1,
             "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
@@ -806,17 +1326,75 @@
       "CoincidencesMetadata": {
         "properties": {
           "channels": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Channels",
-            "description": "List of channel numbers to measure. Required."
+            "description": "List of lists of channel numbers (e.g., [[1, 2]], [[1, 2], [2, 3]]). Required."
+          },
+          "coincidences": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coincidences",
+            "description": "List of lists of channel numbers representing multiple coincidences. E.g., [[1, 2]], [[1, 2], [2, 3, 5]]."
+          },
+          "coincidence_groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coincidence Groups",
+            "description": "Alias for coincidences following Swabian API naming. List of lists of channel numbers."
           },
           "user_name": {
             "type": "string",
             "title": "User Name",
             "description": "The user who booked the channels. Required."
+          },
+          "coincidence_window": {
+            "type": "integer",
+            "title": "Coincidence Window",
+            "description": "Coincidence window in picoseconds. Default: 1000 (1 ns)",
+            "default": 1000
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "Timestamp assignment mode for the coincidence virtual channel ('Last', 'First', 'ListedFirst', 'Average'). Default: 'Last'",
+            "default": "Last"
           },
           "binwidth": {
             "type": "integer",
@@ -835,6 +1413,12 @@
             "title": "Target Location",
             "description": "Target file path for saving results. Supports {datetime} and {measurement-type} placeholders",
             "default": "desktop/MaasData/{datetime}/{measurement-type}"
+          },
+          "refresh_rate": {
+            "type": "integer",
+            "title": "Refresh Rate",
+            "description": "Refresh rate in Hz for live measurements",
+            "default": 25
           }
         },
         "type": "object",
@@ -843,16 +1427,95 @@
           "user_name"
         ],
         "title": "CoincidencesMetadata",
-        "description": "Metadata model for coincidences measurements with required and optional fields.",
+        "description": "Metadata model for coincidences measurements supporting multiple coincidence channel groups as a list of lists.",
         "example": {
           "binwidth": 1000000000,
-          "channels": [
-            1,
-            2,
-            3
+          "coincidence_window": 1000,
+          "coincidences": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3,
+              5
+            ]
           ],
           "n_values": 1,
-          "target_location": "desktop/MaasData/{datetime}/{measurement-type}"
+          "refresh_rate": 25,
+          "target_location": "desktop/MaasData/{datetime}/{measurement-type}",
+          "timestamp": "Last"
+        }
+      },
+      "CorrelationLiveMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "correlation_live"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CorrelationLiveMetadata",
+            "description": "Metadata containing channels, binwidth, n_bins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "CorrelationLiveMeasurementRequest"
+      },
+      "CorrelationLiveMetadata": {
+        "properties": {
+          "channel1": {
+            "type": "integer",
+            "title": "Channel1",
+            "description": "First channel number to correlate. Required."
+          },
+          "channel2": {
+            "type": "integer",
+            "title": "Channel2",
+            "description": "Second channel number to correlate. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "binwidth": {
+            "type": "integer",
+            "title": "Binwidth",
+            "description": "Bin width in picoseconds for histogram. Default: 1e3",
+            "default": 1000
+          },
+          "n_bins": {
+            "type": "integer",
+            "title": "N Bins",
+            "description": "Number of bins in the histogram. Default: 1000",
+            "default": 1000
+          },
+          "refresh_rate": {
+            "type": "integer",
+            "title": "Refresh Rate",
+            "description": "Refresh rate in Hz for live measurements",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel1",
+          "channel2",
+          "user_name"
+        ],
+        "title": "CorrelationLiveMetadata",
+        "description": "Metadata model for live correlation measurements.",
+        "example": {
+          "binwidth": 1000000,
+          "channel1": 1,
+          "channel2": 2,
+          "n_bins": 1000,
+          "refresh_rate": 25,
+          "user_name": "abc-123-def"
         }
       },
       "CorrelationMeasurementRequest": {
@@ -950,11 +1613,6 @@
             "$ref": "#/components/schemas/MeasurementType",
             "default": "count_rate_live"
           },
-          "duration_seconds": {
-            "type": "integer",
-            "title": "Duration Seconds",
-            "description": "Duration in seconds for the count-rate measurement"
-          },
           "metadata": {
             "$ref": "#/components/schemas/CountRateMetadata",
             "description": "Metadata containing channels, binwidth, and n_values"
@@ -962,13 +1620,11 @@
         },
         "type": "object",
         "required": [
-          "duration_seconds",
           "metadata"
         ],
         "title": "CountRateLiveMeasurementRequest",
         "description": "Request model for live count-rate measurements.",
         "example": {
-          "duration_seconds": 60,
           "measurement_type": "count_rate_live",
           "metadata": {
             "binwidth": 1000000000,
@@ -1053,6 +1709,12 @@
             "title": "Target Location",
             "description": "Target file path for saving results. Supports {datetime} and {measurement-type} placeholders",
             "default": "desktop/MaasData/{datetime}/{measurement-type}"
+          },
+          "refresh_rate": {
+            "type": "integer",
+            "title": "Refresh Rate",
+            "description": "Refresh rate in Hz for live measurements",
+            "default": 25
           }
         },
         "type": "object",
@@ -1073,6 +1735,24 @@
           "target_location": "desktop/MaasData/{datetime}/{measurement-type}"
         }
       },
+      "CreateUserRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "role_id": {
+            "type": "integer",
+            "title": "Role Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "role_id"
+        ],
+        "title": "CreateUserRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1085,6 +1765,112 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistogramLiveMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "histogram_live"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/HistogramLiveMetadata",
+            "description": "Metadata containing channels, binwidth, n_bins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "HistogramLiveMeasurementRequest"
+      },
+      "HistogramLiveMetadata": {
+        "properties": {
+          "click_channel": {
+            "type": "integer",
+            "title": "Click Channel",
+            "description": "Click channel number. Required."
+          },
+          "start_channel": {
+            "type": "integer",
+            "title": "Start Channel",
+            "description": "Start channel number. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "binwidth": {
+            "type": "integer",
+            "title": "Binwidth",
+            "description": "Bin width in picoseconds for histogram. Default: 1e3 (1 millisecond)",
+            "default": 1000
+          },
+          "n_bins": {
+            "type": "integer",
+            "title": "N Bins",
+            "description": "Number of bins in the histogram. Default: 1000",
+            "default": 1000
+          },
+          "refresh_rate": {
+            "type": "integer",
+            "title": "Refresh Rate",
+            "description": "Refresh rate in Hz for live measurements",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "click_channel",
+          "start_channel",
+          "user_name"
+        ],
+        "title": "HistogramLiveMetadata",
+        "description": "Metadata model for live Histogram measurements.",
+        "example": {
+          "binwidth": 1000000,
+          "click_channel": 1,
+          "n_bins": 1000,
+          "refresh_rate": 25,
+          "start_channel": 2,
+          "user_name": "abc-123-def"
+        }
+      },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "expires_in"
+        ],
+        "title": "LoginResponse"
       },
       "MeasurementResponse": {
         "properties": {
@@ -1188,10 +1974,16 @@
         "enum": [
           "count_rate",
           "count_rate_live",
+          "coincidences_live",
           "save_raw_tags",
           "correlation",
           "coincidences",
-          "set_parameters"
+          "set_parameters",
+          "startstop_live",
+          "histogram_live",
+          "correlation_live",
+          "coincidence",
+          "coincidence_live"
         ],
         "title": "MeasurementType",
         "description": "Supported measurement types. Extensible for future types."
@@ -1365,6 +2157,94 @@
             "user_name": "abc-123-def"
           }
         }
+      },
+      "StartStopLiveMeasurementRequest": {
+        "properties": {
+          "measurement_type": {
+            "$ref": "#/components/schemas/MeasurementType",
+            "default": "startstop_live"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/StartStopLiveMetadata",
+            "description": "Metadata containing channels, binwidth, n_bins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "StartStopLiveMeasurementRequest"
+      },
+      "StartStopLiveMetadata": {
+        "properties": {
+          "click_channel": {
+            "type": "integer",
+            "title": "Click Channel",
+            "description": "Click channel number. Required."
+          },
+          "start_channel": {
+            "type": "integer",
+            "title": "Start Channel",
+            "description": "Start channel number. Required."
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "The user who booked the channels. Required."
+          },
+          "binwidth": {
+            "type": "integer",
+            "title": "Binwidth",
+            "description": "Bin width in picoseconds for histogram. Default: 1e3 (1 millisecond)",
+            "default": 1000
+          },
+          "n_bins": {
+            "type": "integer",
+            "title": "N Bins",
+            "description": "Number of bins in the histogram. Default: 1000",
+            "default": 1000
+          },
+          "refresh_rate": {
+            "type": "integer",
+            "title": "Refresh Rate",
+            "description": "Refresh rate in Hz for live measurements",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "click_channel",
+          "start_channel",
+          "user_name"
+        ],
+        "title": "StartStopLiveMetadata",
+        "description": "Metadata model for live StartStop measurements.",
+        "example": {
+          "binwidth": 1000000,
+          "click_channel": 1,
+          "n_bins": 1000,
+          "refresh_rate": 25,
+          "start_channel": 2,
+          "user_name": "abc-123-def"
+        }
+      },
+      "UpdatePasswordRequest": {
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "title": "Old Password"
+          },
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_password",
+          "new_password"
+        ],
+        "title": "UpdatePasswordRequest"
       },
       "ValidationError": {
         "properties": {

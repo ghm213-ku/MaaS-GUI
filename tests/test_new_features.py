@@ -47,10 +47,10 @@ def test_login_negative_empty(qtbot, mocker):
     assert window.stacked_widget.currentWidget() == window.login_widget
 
 def test_change_password_positive(qtbot, mocker):
-    mock_post = mocker.patch("requests.Session.post")
+    mock_put = mocker.patch("requests.Session.put")
     mock_resp = mocker.Mock()
     mock_resp.status_code = 200
-    mock_post.return_value = mock_resp
+    mock_put.return_value = mock_resp
     
     mocker.patch("ui.main_window.QMessageBox.information")
     
@@ -138,36 +138,104 @@ def test_export_histogram_negative_no_data(qtbot, mocker):
     )
 
 
-def test_coincidences_tab_positive(qtbot):
+def test_coincidences_tab_boxes_add_remove(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
     
-    # Check initial state
-    window.get_selected_channels = lambda: [1, 2, 3, 4, 5]
-    assert len(window.coinc_combos) == 2
+    # Check default 1 box
+    assert len(window.coinc_boxes) == 1
+    assert len(window.coinc_combos) == 1
     
-    # Click + button
+    # Click + button to add boxes
     window.coinc_btn_add.click()
-    assert len(window.coinc_combos) == 3
+    assert len(window.coinc_boxes) == 2
     
-    # Click + button again
     window.coinc_btn_add.click()
-    assert len(window.coinc_combos) == 4
+    assert len(window.coinc_boxes) == 3
     
-    # Click - button
+    # Click - button to remove boxes
     window.coinc_btn_remove.click()
-    assert len(window.coinc_combos) == 3
+    assert len(window.coinc_boxes) == 2
 
-def test_coincidences_tab_negative(qtbot):
+    window.coinc_btn_remove.click()
+    assert len(window.coinc_boxes) == 1
+
+    # Should not remove below 1 box
+    window.coinc_btn_remove.click()
+    assert len(window.coinc_boxes) == 1
+
+
+def test_coincidences_tab_validation_format_and_empty(qtbot, mocker):
     window = MainWindow()
     qtbot.addWidget(window)
-    
-    # Check initial state
-    assert len(window.coinc_combos) == 2
-    
-    # Click - button, should not remove below 2
-    window.coinc_btn_remove.click()
-    assert len(window.coinc_combos) == 2
-    
-    window.coinc_btn_remove.click()
-    assert len(window.coinc_combos) == 2
+    window.get_selected_channels = lambda: [1, 2, 3]
+    mock_warn = mocker.patch('PyQt6.QtWidgets.QMessageBox.warning')
+
+    # 1. Empty box validation
+    window.coinc_boxes[0].setText('')
+    window.start_coincidences_measurement()
+    assert mock_warn.called
+    assert window.coinc_worker is None
+
+    # 2. Non-integer format validation
+    mock_warn.reset_mock()
+    window.coinc_boxes[0].setText('1, abc')
+    window.start_coincidences_measurement()
+    assert mock_warn.called
+    assert 'Invalid Format' in mock_warn.call_args[0][1]
+    assert window.coinc_worker is None
+
+    # 3. Single channel validation (< 2 channels)
+    mock_warn.reset_mock()
+    window.coinc_boxes[0].setText('1')
+    window.start_coincidences_measurement()
+    assert mock_warn.called
+    assert 'at least 2 channels' in mock_warn.call_args[0][2].lower()
+    assert window.coinc_worker is None
+
+    # 4. Duplicate channels within group validation
+    mock_warn.reset_mock()
+    window.coinc_boxes[0].setText('1, 1')
+    window.start_coincidences_measurement()
+    assert mock_warn.called
+    assert 'duplicate' in mock_warn.call_args[0][2].lower()
+    assert window.coinc_worker is None
+
+
+def test_coincidences_tab_validation_unselected_channels(qtbot, mocker):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    # User chose channels 1 and 2 in the beginning
+    window.get_selected_channels = lambda: [1, 2]
+    mock_warn = mocker.patch('PyQt6.QtWidgets.QMessageBox.warning')
+
+    # Box contains channel 3 which was not chosen in the beginning
+    window.coinc_boxes[0].setText('1, 3')
+    window.start_coincidences_measurement()
+    assert mock_warn.called
+    assert 'Channel Not Selected' in mock_warn.call_args[0][1]
+    assert 'not chosen' in mock_warn.call_args[0][2].lower()
+    assert window.coinc_worker is None
+
+
+def test_coincidences_tab_validation_success_and_multi_group(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.force_mock = True
+    window.get_selected_channels = lambda: [1, 2, 3, 4]
+
+    # Group 1: 1, 2, 3
+    window.coinc_boxes[0].setText('1, 2, 3')
+
+    # Group 2: 2, 4
+    window.coinc_btn_add.click()
+    assert len(window.coinc_boxes) == 2
+    window.coinc_boxes[1].setText('2, 4')
+
+    window.start_coincidences_measurement()
+    assert window.coinc_worker is not None
+    assert window.coinc_worker.coincidences == [[1, 2, 3], [2, 4]]
+    assert window.coinc_worker.channels == [1, 2, 3, 4]
+
+    window.coinc_worker.stop()
+    window.coinc_worker.wait(1000)
