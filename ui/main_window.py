@@ -47,6 +47,15 @@ class ChannelConfigPopup(QDialog):
         layout.addRow("Delay (ps):", self.delay_input)
         layout.addRow(self.btn_save)
 
+    def parse_values(self):
+        """Return (trigger_V, delay_ps), or None if either field is not a valid number."""
+        try:
+            trigger = float(self.trigger_input.text().replace(',', '.'))
+            delay = int(self.delay_input.text())
+        except ValueError:
+            return None
+        return trigger, delay
+
     def get_values(self):
         try:
             # Replace comma with dot for locales that use comma decimals
@@ -72,6 +81,9 @@ class ChannelNodeWidget(QFrame):
         
         self.trigger_val = 0.5
         self.delay_val = 0
+        # Optional callable(channel, trigger_V, delay_ps) -> bool, set by MainWindow to
+        # send the new values to MaaS. The values are only kept if it returns True.
+        self.apply_parameters = None
         
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -96,11 +108,22 @@ class ChannelNodeWidget(QFrame):
         from PyQt6.QtGui import QCursor
         popup.move(QCursor.pos())
         if popup.exec() == QDialog.DialogCode.Accepted:
-            t, d = popup.get_values()
-            self.trigger_val = t
-            self.delay_val = d
-            self.lbl_trig.setText(f"{t}V")
-            self.lbl_dly.setText(f"{d}ps")
+            values = popup.parse_values()
+            if values is None:
+                QMessageBox.warning(self.window(), "Invalid Input",
+                                    "Trigger must be a number (V) and delay a whole number (ps).")
+                return
+            self.set_parameters(*values)
+
+    def set_parameters(self, trigger, delay):
+        """Apply new trigger/delay values, sending them to MaaS first when connected."""
+        if self.apply_parameters is not None and not self.apply_parameters(self.channel_id, trigger, delay):
+            return False
+        self.trigger_val = trigger
+        self.delay_val = delay
+        self.lbl_trig.setText(f"{trigger}V")
+        self.lbl_dly.setText(f"{delay}ps")
+        return True
             
     def set_booked_by(self, user_name, is_current_user):
         self.booked_by = user_name
@@ -1159,6 +1182,7 @@ class MainWindow(QMainWindow):
             for col in range(1, 19):
                 ch = col
                 container = ChannelNodeContainer(ch)
+                container.node.apply_parameters = self.apply_channel_parameters
                 grid_layout.addWidget(container, row + 1, col)
                 self.channel_nodes[ch] = container
 
@@ -1202,6 +1226,50 @@ class MainWindow(QMainWindow):
                         self.channel_nodes[ch_num].set_booked_by(user_name, is_current)
         except Exception as e:
             logger.error(f"Failed to fetch booked channels: {e}")
+
+    def apply_channel_parameters(self, channel, trigger, delay):
+        """Send a channel's trigger voltage and input delay to MaaS (POST /set-parameters/).
+
+        Returns True if the new values should be kept. Channels must already be booked
+        by the current user on the home page.
+        """
+        if getattr(self, 'force_mock', False):
+            return True
+
+        container = self.channel_nodes.get(channel)
+        if container is None or not (container.node.booked_by and container.node.is_current_user):
+            QMessageBox.warning(self, "Channel Not Booked",
+                                f"Channel {channel} is not booked by you. Book it on the home page "
+                                "before changing its trigger and delay.")
+            return False
+
+        user_name = self.user_name_input.text().strip()
+        payload = {
+            "measurement_type": "set_parameters",
+            "duration_seconds": 0,
+            "metadata": {
+                "channels": [channel],
+                "user_name": user_name,
+                "trigger_voltage": trigger,
+                "input_delay": delay,
+            },
+        }
+        try:
+            resp = self.session.post(f"{self.api_url}/set-parameters/", json=payload, timeout=5)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to send parameters for channel {channel}: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to connect to backend: {e}")
+            return False
+
+        if resp.status_code in (200, 201):
+            logger.info(f"Set parameters for channel {channel}: trigger={trigger} V, delay={delay} ps")
+            return True
+
+        logger.error(f"MaaS rejected parameters for channel {channel}: {resp.status_code} {resp.text}")
+        QMessageBox.warning(self, "Set Parameters Failed",
+                            f"MaaS rejected the trigger/delay for channel {channel} "
+                            f"(status {resp.status_code}):\n{resp.text}")
+        return False
 
     def book_channels(self):
         if getattr(self, 'force_mock', False):
