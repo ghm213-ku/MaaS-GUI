@@ -13,8 +13,9 @@ def normalize_server_url(server_ip="127.0.0.1", default_port=8000):
     """
     Normalizes a server IP address, hostname, or URL string into HTTP and WebSocket base URLs.
     """
-    if not server_ip or not str(server_ip).strip():
-        server_ip = "127.0.0.1"
+    # if not server_ip or not str(server_ip).strip():
+    #     server_ip = "127.0.0.1"
+    server_ip = "10.51.49.251"
     raw = str(server_ip).strip()
 
     if raw.startswith("http://") or raw.startswith("https://"):
