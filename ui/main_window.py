@@ -3,6 +3,7 @@ import requests
 import json
 import base64
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from hardware.worker import CountRateWorker
+from hardware.worker import CountRateWorker, normalize_server_url
 from hardware.histogram_worker import HistogramWorker
 from hardware.coincidences_worker import CoincidencesWorker
 
@@ -256,9 +257,16 @@ class SITimeAxisItem(pg.AxisItem):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, force_mock=False):
+    def __init__(self, force_mock=False, server_ip=None):
         super().__init__()
         self.force_mock = force_mock
+
+        if server_ip is None:
+            server_ip = os.environ.get("MAAS_IP", os.environ.get("MAAS_HOST", "127.0.0.1"))
+        self.server_ip = str(server_ip).strip() if server_ip else "127.0.0.1"
+        self.server_url, self.ws_server_url = normalize_server_url(self.server_ip)
+        self.api_url = f"{self.server_url}/api/v1"
+        self.ws_api_url = f"{self.ws_server_url}/api/v1"
         
         self.auth_token = ""
         self.login_username = ""
@@ -267,7 +275,7 @@ class MainWindow(QMainWindow):
         self.add_user_tab = None
         
         self.setWindowTitle("Swabian Count Rate Monitor")
-        self.resize(250, 180)
+        self.resize(260, 220)
         self.worker = None
         self.old_workers = []
         self.session = requests.Session()
@@ -329,6 +337,18 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentWidget(self.login_widget)
 
 
+    def set_server_ip(self, ip_address: str):
+        if not ip_address or not str(ip_address).strip():
+            ip_address = "127.0.0.1"
+        self.server_ip = str(ip_address).strip()
+        self.server_url, self.ws_server_url = normalize_server_url(self.server_ip)
+        self.api_url = f"{self.server_url}/api/v1"
+        self.ws_api_url = f"{self.ws_server_url}/api/v1"
+        if hasattr(self, 'login_server_ip_input') and self.login_server_ip_input.text() != self.server_ip:
+            self.login_server_ip_input.setText(self.server_ip)
+        if hasattr(self, 'account_server_ip_input') and self.account_server_ip_input.text() != self.server_ip:
+            self.account_server_ip_input.setText(self.server_ip)
+
     def build_login_screen(self):
         self.login_widget = QWidget()
         layout = QVBoxLayout(self.login_widget)
@@ -350,6 +370,12 @@ class MainWindow(QMainWindow):
         self.login_password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.login_password_input.setFixedWidth(180)
         self.login_password_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 2px;")
+
+        self.login_server_ip_input = QLineEdit(getattr(self, 'server_ip', '127.0.0.1'))
+        self.login_server_ip_input.setPlaceholderText("MaaS IP (e.g. 192.168.1.100)")
+        self.login_server_ip_input.setFixedWidth(180)
+        self.login_server_ip_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 2px;")
+        self.server_ip_input = self.login_server_ip_input
         
         self.btn_login = QPushButton("Login")
         self.btn_login.setFixedWidth(180)
@@ -358,11 +384,13 @@ class MainWindow(QMainWindow):
         self.btn_login.setDefault(True)
         self.btn_login.setAutoDefault(True)
         self.login_username_input.returnPressed.connect(self.login_password_input.setFocus)
-        self.login_password_input.returnPressed.connect(self.btn_login.click)
+        self.login_password_input.returnPressed.connect(self.login_server_ip_input.setFocus)
+        self.login_server_ip_input.returnPressed.connect(self.btn_login.click)
         self.btn_login.clicked.connect(self.authenticate)
         
         layout.addWidget(self.login_username_input, alignment=Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(self.login_password_input, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self.login_server_ip_input, alignment=Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(self.btn_login, alignment=Qt.AlignmentFlag.AlignHCenter)
 
     def decode_jwt_token(self, token: str) -> dict:
@@ -635,7 +663,7 @@ class MainWindow(QMainWindow):
             import requests
             headers = {"Authorization": f"Bearer {self.auth_token}"}
             payload = {"username": username, "role_id": int(role_id)}
-            resp = self.session.post("http://127.0.0.1:8000/auth/users", json=payload, headers=headers, timeout=5)
+            resp = self.session.post(f"{self.server_url}/auth/users", json=payload, headers=headers, timeout=5)
 
             if resp.status_code == 201:
                 QMessageBox.information(self, "Success", f"User '{username}' with role '{role_name}' created successfully.")
@@ -697,7 +725,7 @@ class MainWindow(QMainWindow):
         try:
             import requests
             headers = {"Authorization": f"Bearer {self.auth_token}"}
-            resp = self.session.delete(f"http://127.0.0.1:8000/auth/users/{username}", headers=headers, timeout=5)
+            resp = self.session.delete(f"{self.server_url}/auth/users/{username}", headers=headers, timeout=5)
 
             if resp.status_code == 200:
                 QMessageBox.information(self, "Success", f"User '{username}' deleted successfully.")
@@ -783,7 +811,7 @@ class MainWindow(QMainWindow):
             import requests
             headers = {"Authorization": f"Bearer {self.auth_token}"}
             payload = {"new_password": new_pwd}
-            resp = self.session.put(f"http://127.0.0.1:8000/auth/users/{username}/password", json=payload, headers=headers, timeout=5)
+            resp = self.session.put(f"{self.server_url}/auth/users/{username}/password", json=payload, headers=headers, timeout=5)
 
             if resp.status_code == 200:
                 QMessageBox.information(self, "Success", f"Password for user '{username}' changed successfully.")
@@ -839,6 +867,11 @@ class MainWindow(QMainWindow):
         if not username or not password:
             QMessageBox.warning(self, "Invalid Input", "User Name and Password cannot be empty.")
             return
+
+        if hasattr(self, 'login_server_ip_input'):
+            ip_val = self.login_server_ip_input.text().strip()
+            if ip_val:
+                self.set_server_ip(ip_val)
             
         if getattr(self, 'force_mock', False):
             role = "admin" if username.lower() == "admin" else "operator"
@@ -849,7 +882,7 @@ class MainWindow(QMainWindow):
         else:
             try:
                 import requests
-                resp = requests.post("http://127.0.0.1:8000/auth/login", json={"username": username, "password": password}, timeout=5)
+                resp = requests.post(f"{self.server_url}/auth/login", json={"username": username, "password": password}, timeout=5)
                 if resp.status_code == 401:
                     QMessageBox.warning(self, "Authentication Failed", "Invalid credentials")
                     return
@@ -933,6 +966,50 @@ class MainWindow(QMainWindow):
         self.account_tab = QWidget()
         layout = QVBoxLayout(self.account_tab)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        layout.setSpacing(16)
+        layout.setContentsMargins(30, 20, 30, 20)
+
+        # 1. Server Connection Section
+        server_section_label = QLabel("MaaS Server Connection")
+        server_section_label.setStyleSheet("font-size: 15px; font-weight: bold; margin-bottom: 2px;")
+        layout.addWidget(server_section_label)
+
+        server_desc = QLabel("Configure the IP address or hostname of the PC running the MaaS backend for non-local communication.")
+        server_desc.setStyleSheet("color: #666; font-size: 12px; margin-bottom: 6px;")
+        layout.addWidget(server_desc)
+
+        server_form = QFormLayout()
+        self.account_server_ip_input = QLineEdit(getattr(self, 'server_ip', '127.0.0.1'))
+        self.account_server_ip_input.setPlaceholderText("e.g. 192.168.1.100 or 192.168.1.100:8000")
+        self.account_server_ip_input.setFixedWidth(220)
+        self.account_server_ip_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
+        server_form.addRow("MaaS Server IP:", self.account_server_ip_input)
+        layout.addLayout(server_form)
+
+        server_btn_layout = QHBoxLayout()
+        self.btn_update_server_ip = QPushButton("Apply Server IP")
+        self.btn_update_server_ip.setFixedWidth(130)
+        self.btn_update_server_ip.clicked.connect(self.update_server_ip)
+        server_btn_layout.addWidget(self.btn_update_server_ip)
+
+        self.btn_test_connection = QPushButton("Test Connection")
+        self.btn_test_connection.setFixedWidth(130)
+        self.btn_test_connection.clicked.connect(self.test_connection)
+        server_btn_layout.addWidget(self.btn_test_connection)
+        server_btn_layout.addStretch()
+        layout.addLayout(server_btn_layout)
+
+        # Separator line
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        sep.setStyleSheet("color: #e0e0e0; margin-top: 10px; margin-bottom: 10px;")
+        layout.addWidget(sep)
+
+        # 2. Change Password Section
+        pwd_section_label = QLabel("Account Password Update")
+        pwd_section_label.setStyleSheet("font-size: 15px; font-weight: bold; margin-bottom: 2px;")
+        layout.addWidget(pwd_section_label)
         
         form_layout = QFormLayout()
         
@@ -960,6 +1037,39 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(self.btn_change_password)
 
+    def update_server_ip(self):
+        ip = self.account_server_ip_input.text().strip()
+        if not ip:
+            QMessageBox.warning(self, "Invalid IP", "Please enter a valid IP address or hostname.")
+            return
+        self.set_server_ip(ip)
+        QMessageBox.information(self, "Server IP Updated", f"MaaS server address set to: {self.server_url}")
+
+    def test_connection(self):
+        ip = self.account_server_ip_input.text().strip()
+        if not ip:
+            QMessageBox.warning(self, "Invalid IP", "Please enter a valid IP address or hostname.")
+            return
+        self.set_server_ip(ip)
+        try:
+            resp = self.session.get(f"{self.server_url}/health", timeout=3)
+            if resp.status_code == 200:
+                status_text = "healthy"
+                try:
+                    data = resp.json()
+                    status_text = data.get("status", "healthy")
+                except Exception:
+                    pass
+                QMessageBox.information(
+                    self,
+                    "Connection Successful",
+                    f"Successfully connected to MaaS server at {self.server_url}.\nStatus: {status_text}"
+                )
+            else:
+                QMessageBox.warning(self, "Connection Warning", f"Server responded with HTTP status {resp.status_code} at {self.server_url}.")
+        except Exception as e:
+            QMessageBox.critical(self, "Connection Failed", f"Could not connect to MaaS server at {self.server_url}:\n{e}")
+
     def change_password(self):
         old_pwd = self.old_password_input.text()
         new_pwd = self.new_password_input.text()
@@ -981,7 +1091,7 @@ class MainWindow(QMainWindow):
             return
             
         try:
-            resp = self.session.put("http://127.0.0.1:8000/auth/password", 
+            resp = self.session.put(f"{self.server_url}/auth/password", 
                 json={"old_password": old_pwd, "new_password": new_pwd}, timeout=5)
             
             if resp.status_code == 200:
@@ -1074,7 +1184,7 @@ class MainWindow(QMainWindow):
         if getattr(self, 'force_mock', False):
             return
         try:
-            resp = self.session.get("http://127.0.0.1:8000/api/v1/channels", timeout=2)
+            resp = self.session.get(f"{self.api_url}/channels", timeout=2)
             if resp.status_code == 200:
                 # Clear all first
                 for container in self.channel_nodes.values():
@@ -1117,7 +1227,7 @@ class MainWindow(QMainWindow):
                 "user_name": user_name,
                 "channel_numbers": channels
             }
-            resp = self.session.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
+            resp = self.session.post(f"{self.api_url}/channels/book", json=payload, timeout=2)
             if resp.status_code == 201:
                 logger.info(f"Booked channels: {channels}")
             else:
@@ -1155,7 +1265,7 @@ class MainWindow(QMainWindow):
         
         try:
             # Release all for user
-            resp = self.session.post(f"http://127.0.0.1:8000/api/v1/channels/release/{user_name}", timeout=2)
+            resp = self.session.post(f"{self.api_url}/channels/release/{user_name}", timeout=2)
             if resp.status_code == 200:
                 logger.info(f"Released all channels for {user_name}")
                 # Re-book the ones they want to keep
@@ -1164,7 +1274,7 @@ class MainWindow(QMainWindow):
                         "user_name": user_name,
                         "channel_numbers": to_keep
                     }
-                    book_resp = self.session.post("http://127.0.0.1:8000/api/v1/channels/book", json=payload, timeout=2)
+                    book_resp = self.session.post(f"{self.api_url}/channels/book", json=payload, timeout=2)
                     if book_resp.status_code != 201:
                         QMessageBox.warning(self, "Re-booking Failed", f"Released channels, but failed to re-book kept channels: {book_resp.text}")
             else:
@@ -1531,7 +1641,8 @@ class MainWindow(QMainWindow):
             coincidence_window=window_ps,
             binwidth=int(1e9),
             auth_token=self.auth_token,
-            is_mock=self.force_mock)
+            is_mock=self.force_mock,
+            server_ip=self.server_ip)
         self.coinc_worker.newDataReady.connect(self.update_coincidences_plot)
         self.coinc_worker.start()
 
@@ -2024,7 +2135,7 @@ class MainWindow(QMainWindow):
     def start_measurement(self):
         # Verify Backend Health
         try:
-            health_resp = self.session.get("http://127.0.0.1:8000/health", timeout=2)
+            health_resp = self.session.get(f"{self.server_url}/health", timeout=2)
             if health_resp.status_code != 200 or health_resp.json().get("status") != "healthy":
                 logger.warning(f"MaaS backend is not healthy. Status Code: {health_resp.status_code}. Falling back to mock data mode.")
         except Exception as e:
@@ -2137,7 +2248,7 @@ class MainWindow(QMainWindow):
                 else:
                     self.plot_widget.setLabel('left', f'Counts / {binwidth}ps')
             
-            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, refresh_rate, mode=mode, auth_token=self.auth_token, is_mock=self.force_mock)
+            self.worker = CountRateWorker(channels, user_name, binwidth, n_values, refresh_rate, mode=mode, auth_token=self.auth_token, is_mock=self.force_mock, server_ip=self.server_ip)
             self.worker.finished.connect(self.on_worker_finished)
             
             if self.worker.booking_error:

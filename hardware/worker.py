@@ -8,13 +8,39 @@ import atexit
 
 logger = logging.getLogger(__name__)
 
+
+def normalize_server_url(server_ip="127.0.0.1", default_port=8000):
+    """
+    Normalizes a server IP address, hostname, or URL string into HTTP and WebSocket base URLs.
+    """
+    if not server_ip or not str(server_ip).strip():
+        server_ip = "127.0.0.1"
+    raw = str(server_ip).strip()
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        http_url = raw.rstrip("/")
+        ws_url = "wss://" + http_url[8:] if http_url.startswith("https://") else "ws://" + http_url[7:]
+    elif raw.startswith("ws://") or raw.startswith("wss://"):
+        ws_url = raw.rstrip("/")
+        http_url = "https://" + ws_url[6:] if ws_url.startswith("wss://") else "http://" + ws_url[5:]
+    else:
+        if ":" in raw:
+            host_port = raw
+        else:
+            host_port = f"{raw}:{default_port}"
+        http_url = f"http://{host_port}"
+        ws_url = f"ws://{host_port}"
+
+    return http_url, ws_url
+
+
 class CountRateWorker(QThread):
     """
     Background thread dedicated to interacting with the MaaS API via Redis Pub/Sub.
     """
     newDataReady = pyqtSignal(np.ndarray)
 
-    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token="", is_mock=False):
+    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token="", is_mock=False, server_ip="127.0.0.1"):
         super().__init__()
         self.channels = channels
         self.running = True
@@ -23,8 +49,10 @@ class CountRateWorker(QThread):
         self.n_values = n_values
         self.refresh_rate = refresh_rate
         self.mode = mode
-        self.base_url = "http://127.0.0.1:8000/api/v1"
-        self.ws_base_url = "ws://127.0.0.1:8000/api/v1"
+        self.server_ip = server_ip
+        http_url, ws_url = normalize_server_url(server_ip)
+        self.base_url = f"{http_url}/api/v1"
+        self.ws_base_url = f"{ws_url}/api/v1"
         self.auth_token = auth_token
         self.session = requests.Session()
         if self.auth_token:

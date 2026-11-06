@@ -5,6 +5,7 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
+from hardware.worker import normalize_server_url
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class CoincidencesWorker(QThread):
         coincidence_window=1000,
         timestamp="Last",
         stream_index=None,
+        server_ip="127.0.0.1",
     ):
         super().__init__()
         # Normalize coincidences input into list of lists: [[ch1, ch2, ...], ...]
@@ -59,8 +61,10 @@ class CoincidencesWorker(QThread):
         self.mode = mode
         self.stream_index = stream_index
         self.latest_streams = []
-        self.base_url = "http://127.0.0.1:8000/api/v1"
-        self.ws_base_url = "ws://127.0.0.1:8000/api/v1"
+        self.server_ip = server_ip
+        http_url, ws_url = normalize_server_url(server_ip)
+        self.base_url = f"{http_url}/api/v1"
+        self.ws_base_url = f"{ws_url}/api/v1"
         self.auth_token = auth_token
         self.session = requests.Session()
         if self.auth_token:

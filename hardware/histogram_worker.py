@@ -5,6 +5,7 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
+from hardware.worker import normalize_server_url
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ class HistogramWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray, np.ndarray)
     
-    def __init__(self, start_channel, click_channel, user_name, binwidth, n_values, mode, auth_token="", is_mock=False):
+    def __init__(self, start_channel, click_channel, user_name, binwidth, n_values, mode, auth_token="", is_mock=False, server_ip="127.0.0.1"):
         super().__init__()
         self.running = True
         self.start_channel = start_channel
@@ -24,8 +25,10 @@ class HistogramWorker(QThread):
         self.binwidth = binwidth
         self.n_values = n_values
         self.mode = mode
-        self.base_url = "http://127.0.0.1:8000/api/v1"
-        self.ws_base_url = "ws://127.0.0.1:8000/api/v1"
+        self.server_ip = server_ip
+        http_url, ws_url = normalize_server_url(server_ip)
+        self.base_url = f"{http_url}/api/v1"
+        self.ws_base_url = f"{ws_url}/api/v1"
         self.auth_token = auth_token
         self.session = requests.Session()
         if self.auth_token:
