@@ -1643,13 +1643,15 @@ class MainWindow(QMainWindow):
             auth_token=self.auth_token,
             is_mock=self.force_mock,
             server_ip=self.server_ip)
-        self.coinc_worker.newDataReady.connect(self.update_coincidences_plot)
-        self.coinc_worker.start()
-
+        # Check the booking before starting the worker, so no measurement is
+        # ever started on channels the user has not booked.
         if self.coinc_worker.booking_error:
-            QMessageBox.critical(self, "Booking Failed", self.coinc_worker.booking_error)
+            QMessageBox.critical(self, "Cannot Start Measurement", self.coinc_worker.booking_error)
             self.stop_coincidences_measurement()
             return
+
+        self.coinc_worker.newDataReady.connect(self.update_coincidences_plot)
+        self.coinc_worker.start()
         
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
@@ -2258,7 +2260,7 @@ class MainWindow(QMainWindow):
             self.worker.finished.connect(self.on_worker_finished)
             
             if self.worker.booking_error:
-                QMessageBox.critical(self, "Booking Failed", self.worker.booking_error)
+                QMessageBox.critical(self, "Cannot Start Measurement", self.worker.booking_error)
                 self.worker = None
                 return
                 
@@ -2448,11 +2450,13 @@ class MainWindow(QMainWindow):
             binwidth=binwidth,
             n_values=n_values,
             mode=mode,
-            is_mock=self.force_mock
+            auth_token=self.auth_token,
+            is_mock=self.force_mock,
+            server_ip=self.server_ip
         )
 
         if self.hist_worker.booking_error:
-            QMessageBox.warning(self, "Channel Conflict", self.hist_worker.booking_error)
+            QMessageBox.warning(self, "Cannot Start Measurement", self.hist_worker.booking_error)
             self.hist_worker = None
             return
 
@@ -2507,11 +2511,13 @@ class MainWindow(QMainWindow):
             binwidth=binwidth,
             n_values=n_values,
             mode=mode,
-            is_mock=self.force_mock
+            auth_token=self.auth_token,
+            is_mock=self.force_mock,
+            server_ip=self.server_ip
         )
 
         if self.hist2_worker.booking_error:
-            QMessageBox.warning(self, "Channel Conflict", self.hist2_worker.booking_error)
+            QMessageBox.warning(self, "Cannot Start Measurement", self.hist2_worker.booking_error)
             self.hist2_worker = None
             return
 

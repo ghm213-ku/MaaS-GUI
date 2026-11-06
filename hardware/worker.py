@@ -35,6 +35,39 @@ def normalize_server_url(server_ip="127.0.0.1", default_port=8000):
     return http_url, ws_url
 
 
+
+def check_channels_booked(session, base_url, channels, user_name):
+    """Verify that every channel in ``channels`` is already booked by ``user_name``.
+
+    Workers never book (or release) channels themselves: booking and releasing
+    only happen when the user clicks Book / Release on the home page. Returns
+    an error message for the user, or None if all channels are booked by them.
+    Raises requests.exceptions.RequestException if MaaS cannot be queried.
+    """
+    resp = session.get(f"{base_url}/channels", timeout=2)
+    resp.raise_for_status()
+    channels_info = {c.get("channel_number"): c for c in resp.json().get("channels", [])}
+
+    not_booked = []
+    booked_by_others = {}
+    for ch in channels:
+        info = channels_info.get(ch)
+        if not info or info.get("status") != "booked":
+            not_booked.append(ch)
+        elif info.get("user_name") != user_name:
+            booked_by_others.setdefault(info.get("user_name") or "Unknown", []).append(ch)
+
+    problems = []
+    if not_booked:
+        problems.append(f"Channel(s) {not_booked} are not booked.")
+    for other, chs in booked_by_others.items():
+        problems.append(f"Channel(s) {chs} are booked by {other}.")
+    if problems:
+        return (" ".join(problems) +
+                f" Book the channels as '{user_name}' on the home page before starting a measurement.")
+    return None
+
+
 class CountRateWorker(QThread):
     """
     Background thread dedicated to interacting with the MaaS API via Redis Pub/Sub.
@@ -66,54 +99,18 @@ class CountRateWorker(QThread):
         
         atexit.register(self.force_teardown)
 
-        # Book channels with a slight retry
+        # Channels must already be booked by this user via the home page;
+        # the worker never books channels itself.
         if self.is_mock:
             return
 
-        for attempt in range(5):
-            try:
-                # 1. Check current status of all requested channels
-                channels_info = self.session.get(f"{self.base_url}/channels", timeout=2).json().get("channels", [])
-                
-                conflict_users = set()
-                channels_to_book = []
-                
-                for ch in self.channels:
-                    ch_status = next((c for c in channels_info if c["channel_number"] == ch), None)
-                    if ch_status and ch_status.get("status") == "booked":
-                        if ch_status.get("user_name") != self.user_name:
-                            conflict_users.add(ch_status.get("user_name", "Unknown"))
-                    else:
-                        channels_to_book.append(ch)
-                        
-                if conflict_users:
-                    logger.warning(f"MaaS API channel booking conflict: channels already used by {conflict_users}")
-                    self.booking_error = f"Channels are already booked by: {', '.join(conflict_users)}"
-                    break
-                    
-                # 2. Book ONLY the channels that are currently available
-                if channels_to_book:
-                    logger.info(f"Attempting to book {len(channels_to_book)} channels via MaaS API: {channels_to_book}")
-                    resp = self.session.post(f"{self.base_url}/channels/book", json={
-                        "user_name": self.user_name,
-                        "channel_numbers": channels_to_book
-                    }, timeout=2)
-                    resp.raise_for_status()
-                    
-                # If we got here, all requested channels are booked by us
-                break
-                
-            except requests.exceptions.RequestException as e:
-                logger.error(f"MaaS backend request failed ({e}). Cannot start CountRateWorker.")
-                self.booking_error = f"MaaS backend request failed: {e}"
-                break
-            except Exception as e:
-                if attempt == 4:
-                    logger.error(f"Failed to book channels: {e}")
-                    self.booking_error = f"Failed to book channels: {e}"
-                else:
-                    import time
-                    time.sleep(0.2)
+        try:
+            self.booking_error = check_channels_booked(self.session, self.base_url, self.channels, self.user_name)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"MaaS backend request failed ({e}). Cannot start CountRateWorker.")
+            self.booking_error = f"MaaS backend request failed: {e}"
+        if self.booking_error:
+            logger.warning(f"CountRateWorker not started: {self.booking_error}")
 
     def run(self):
         if getattr(self, 'is_mock', False):
@@ -285,14 +282,7 @@ class CountRateWorker(QThread):
                 except Exception as e:
                     logger.error(f"Failed to stop measurement (attempt {attempt+1}): {e}")
 
-        # Release channels
-        for attempt in range(2):
-            try:
-                self.session.post(f"{self.base_url}/channels/release/{self.user_name}", timeout=10)
-                logger.info(f"Successfully released channels for {self.user_name}")
-                break
-            except Exception as e:
-                logger.error(f"Failed to release channels (attempt {attempt+1}): {e}")
+        # Channels stay booked: they are only released via the Release button on the home page.
             
     def force_teardown(self):
         """Called by the GUI on exit to ensure teardown runs synchronously before process death."""

@@ -6,16 +6,23 @@ import requests
 import websocket
 from hardware.worker import CountRateWorker
 from hardware.coincidences_worker import CoincidencesWorker
+from hardware.histogram_worker import HistogramWorker
+
+
+def channels_response(mocker, channels):
+    resp = mocker.Mock()
+    resp.status_code = 200
+    resp.json.return_value = {"channels": channels}
+    return resp
 
 
 @pytest.fixture(autouse=True)
 def mock_channels_get(mocker):
-    """Ensure Session.get('/channels') returns available channels by default across tests."""
+    """By default Session.get('/channels') reports channels 1-8 booked by 'testuser'."""
     mock_get = mocker.patch("requests.Session.get")
-    get_resp = mocker.Mock()
-    get_resp.status_code = 200
-    get_resp.json.return_value = {"channels": []}
-    mock_get.return_value = get_resp
+    mock_get.return_value = channels_response(mocker, [
+        {"channel_number": ch, "status": "booked", "user_name": "testuser"} for ch in range(1, 9)
+    ])
     return mock_get
 
 
@@ -25,54 +32,53 @@ def prevent_atexit_teardown(mocker):
     mocker.patch("atexit.register")
 
 
-def test_worker_initialization_and_booking(mocker):
-    # Mock requests.post for successful booking
+def test_worker_with_booked_channels_does_not_book(mocker, mock_channels_get):
     mock_post = mocker.patch("requests.Session.post")
-    mock_resp = mocker.Mock()
-    mock_resp.status_code = 200
-    mock_post.return_value = mock_resp
-    
+
     worker = CountRateWorker([1, 2], "testuser", int(1e9), 1000, 25)
-    
-    # Assert post was called correctly
-    mock_post.assert_called_once_with(
-        f"{worker.base_url}/channels/book",
-        json={"user_name": "testuser", "channel_numbers": [1, 2]},
-        timeout=2
-    )
+
     assert worker.booking_error is None
+    mock_channels_get.assert_called_once_with(f"{worker.base_url}/channels", timeout=2)
+    mock_post.assert_not_called()  # booking only happens via the home page Book button
 
 
-def test_worker_booking_conflict(mocker):
-    # Mock requests.post to raise 409
+def test_worker_unbooked_channels_rejected(mocker, mock_channels_get):
     mock_post = mocker.patch("requests.Session.post")
-    error_resp = mocker.Mock()
-    error_resp.status_code = 409
-    
-    def raise_409(*args, **kwargs):
-        err = requests.exceptions.HTTPError()
-        err.response = error_resp
-        raise err
-        
-    mock_post.side_effect = raise_409
-    
-    # Mock requests.get to return conflicting channels
-    mock_get = mocker.patch("requests.Session.get")
-    get_resp = mocker.Mock()
-    get_resp.json.return_value = {
-        "channels": [
-            {"channel_number": 1, "status": "booked", "user_name": "alice"}
-        ]
-    }
-    mock_get.return_value = get_resp
-    
+    mock_channels_get.return_value = channels_response(mocker, [
+        {"channel_number": 1, "status": "booked", "user_name": "testuser"},
+        {"channel_number": 2, "status": "available", "user_name": None},
+    ])
+
+    worker = CountRateWorker([1, 2, 3], "testuser", int(1e9), 1000, 25)
+
+    assert worker.booking_error is not None
+    assert "[2, 3] are not booked" in worker.booking_error
+    assert "home page" in worker.booking_error
+    mock_post.assert_not_called()
+
+
+def test_worker_channels_booked_by_other_user_rejected(mocker, mock_channels_get):
+    mock_post = mocker.patch("requests.Session.post")
+    mock_channels_get.return_value = channels_response(mocker, [
+        {"channel_number": 1, "status": "booked", "user_name": "alice"},
+    ])
+
     worker = CountRateWorker([1], "testuser", int(1e9), 1000, 25)
-    
-    assert worker.booking_error == "Channels are already booked by: alice"
+
+    assert "[1] are booked by alice" in worker.booking_error
+    mock_post.assert_not_called()
+
+
+def test_worker_backend_error_is_reported(mocker, mock_channels_get):
+    mock_channels_get.side_effect = requests.exceptions.ConnectionError("unreachable")
+
+    worker = CountRateWorker([1], "testuser", int(1e9), 1000, 25)
+
+    assert worker.is_mock is False
+    assert "MaaS backend request failed" in worker.booking_error
 
 
 def test_worker_run_measurement_start(mocker):
-    mocker.patch("requests.Session.post") # Mock booking
     worker = CountRateWorker([1], "testuser", int(1e9), 1000, 25)
     
     # Mock post for measurement start
@@ -108,8 +114,7 @@ def test_worker_run_measurement_start(mocker):
     assert payload["metadata"]["channels"] == [1]
 
 
-def test_worker_teardown(mocker):
-    mocker.patch("requests.Session.post")
+def test_worker_teardown_stops_measurement_but_keeps_channels(mocker):
     worker = CountRateWorker([1], "testuser", int(1e9), 1000, 25)
     worker.measurement_id = "test_id"
     worker.ws = mocker.Mock()
@@ -121,16 +126,31 @@ def test_worker_teardown(mocker):
     
     worker.ws.close.assert_called_once()
     mock_delete.assert_called_once_with(f"{worker.base_url}/measurements/test_id", timeout=10)
-    mock_post.assert_called_once_with(f"{worker.base_url}/channels/release/testuser", timeout=10)
+    mock_post.assert_not_called()  # channels are only released via the home page Release button
+
+
+@pytest.mark.parametrize("worker_factory", [
+    lambda: CountRateWorker([1], "testuser", int(1e9), 1000, 25),
+    lambda: HistogramWorker(1, 2, "testuser", 1000, 100, "Histogram"),
+    lambda: CoincidencesWorker(coincidences=[[1, 2]], user_name="testuser", coincidence_window=1000),
+], ids=["count_rate", "histogram", "coincidences"])
+def test_no_worker_books_or_releases_channels(mocker, worker_factory):
+    mock_post = mocker.patch("requests.Session.post")
+    mocker.patch("requests.Session.delete")
+
+    worker = worker_factory()
+    assert worker.booking_error is None
+    worker.measurement_id = "test_id"
+    worker._perform_teardown()
+
+    posted_urls = [c.args[0] for c in mock_post.call_args_list]
+    assert not any("/channels/book" in u or "/channels/release" in u for u in posted_urls)
 
 
 # ================= CoincidencesWorker Tests =================
 
 def test_coincidences_worker_initialization_with_list_of_lists(mocker):
     mock_post = mocker.patch("requests.Session.post")
-    mock_resp = mocker.Mock()
-    mock_resp.status_code = 200
-    mock_post.return_value = mock_resp
 
     worker = CoincidencesWorker(
         coincidences=[[1, 2], [2, 3]],
@@ -141,18 +161,12 @@ def test_coincidences_worker_initialization_with_list_of_lists(mocker):
     assert worker.coincidences == [[1, 2], [2, 3]]
     assert worker.channels == [1, 2, 3]
     assert worker.coincidence_window == 1500
-    mock_post.assert_called_once_with(
-        f"{worker.base_url}/channels/book",
-        json={"user_name": "testuser", "channel_numbers": [1, 2, 3]},
-        timeout=2,
-    )
+    assert worker.booking_error is None
+    mock_post.assert_not_called()
 
 
 def test_coincidences_worker_initialization_with_1d_channels(mocker):
     mock_post = mocker.patch("requests.Session.post")
-    mock_resp = mocker.Mock()
-    mock_resp.status_code = 200
-    mock_post.return_value = mock_resp
 
     # Passing 1D channel list is automatically normalized to list of lists [[1, 2]]
     worker = CoincidencesWorker(
@@ -164,11 +178,8 @@ def test_coincidences_worker_initialization_with_1d_channels(mocker):
     assert worker.coincidences == [[1, 2]]
     assert worker.channels == [1, 2]
     assert worker.coincidence_window == 2000
-    mock_post.assert_called_once_with(
-        f"{worker.base_url}/channels/book",
-        json={"user_name": "testuser", "channel_numbers": [1, 2]},
-        timeout=2,
-    )
+    assert worker.booking_error is None
+    mock_post.assert_not_called()
 
 
 def test_coincidences_worker_run_measurement_start(mocker):

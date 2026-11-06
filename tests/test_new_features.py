@@ -239,3 +239,34 @@ def test_coincidences_tab_validation_success_and_multi_group(qtbot):
 
     window.coinc_worker.stop()
     window.coinc_worker.wait(1000)
+
+
+@pytest.mark.parametrize("suffix", ["", "2"])
+def test_start_histogram_passes_auth_token_and_server(qtbot, mocker, suffix):
+    """Both histogram tabs must send the login token, otherwise MaaS answers 401."""
+    worker_cls = mocker.patch("ui.main_window.HistogramWorker")
+    worker_cls.return_value.booking_error = None
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.auth_token = "test-token"
+    if suffix:
+        window.build_histogram_tab_2()  # second tab is created on demand
+
+    prefix = f"hist{suffix}"
+    for combo_name, ch in ((f"{prefix}_start_combo", "1"), (f"{prefix}_click_combo", "2")):
+        combo = getattr(window, combo_name)
+        if combo.findText(ch) < 0:
+            combo.addItem(ch)
+        combo.setCurrentText(ch)
+    getattr(window, f"{prefix}_mode_combo").setCurrentText("Histogram")
+    getattr(window, f"{prefix}_binwidth_input").setText("1000")
+    getattr(window, f"{prefix}_n_values_input").setText("100")
+
+    start = window.start_histogram_measurement_2 if suffix else window.start_histogram_measurement
+    start()
+
+    worker_cls.assert_called_once()
+    kwargs = worker_cls.call_args.kwargs
+    assert kwargs["auth_token"] == "test-token"
+    assert kwargs["server_ip"] == window.server_ip

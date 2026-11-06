@@ -383,12 +383,13 @@ def test_coincidences_booking_error_stops_measurement(qtbot, mocker):
 
 
     mocker.patch("hardware.coincidences_worker.CoincidencesWorker.__init__", mock_worker_init)
-    mocker.patch("hardware.coincidences_worker.CoincidencesWorker.start")
+    mock_start = mocker.patch("hardware.coincidences_worker.CoincidencesWorker.start")
 
     window.start_coincidences_measurement()
 
     assert mock_crit.called
-    assert "Booking Failed" in mock_crit.call_args[0][1]
+    assert "Cannot Start Measurement" in mock_crit.call_args[0][1]
+    assert not mock_start.called  # never start a measurement on unbooked channels
     assert "Channels already booked by user_X" in mock_crit.call_args[0][2]
     assert window.coinc_worker is None
 
