@@ -76,7 +76,11 @@ if __name__ == '__main__':
     # Perform the heavy imports while the splash screen is shown
     from ui.main_window import MainWindow
     
-    force_mock = "testing" in sys.argv
+    # Test data is only used when explicitly requested with -testing;
+    # otherwise all data comes from the MaaS backend.
+    force_mock = any(arg in ("-testing", "--testing") for arg in sys.argv[1:])
+    if force_mock:
+        logger.info("Testing mode enabled: using generated test data instead of MaaS")
     window = MainWindow(force_mock=force_mock)
     window.show()
     

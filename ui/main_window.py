@@ -2133,13 +2133,19 @@ class MainWindow(QMainWindow):
         return sorted(channels)
 
     def start_measurement(self):
-        # Verify Backend Health
-        try:
-            health_resp = self.session.get(f"{self.server_url}/health", timeout=2)
-            if health_resp.status_code != 200 or health_resp.json().get("status") != "healthy":
-                logger.warning(f"MaaS backend is not healthy. Status Code: {health_resp.status_code}. Falling back to mock data mode.")
-        except Exception as e:
-            logger.warning(f"Could not connect to the MaaS backend. Falling back to mock data mode. Details: {e}")
+        # Verify Backend Health (skipped in testing mode, which uses generated test data)
+        if not self.force_mock:
+            try:
+                health_resp = self.session.get(f"{self.server_url}/health", timeout=2)
+                healthy = health_resp.status_code == 200 and health_resp.json().get("status") == "healthy"
+                if not healthy:
+                    logger.error(f"MaaS backend is not healthy. Status Code: {health_resp.status_code}.")
+                    QMessageBox.critical(self, "Backend Unavailable", f"The MaaS backend is not healthy (status code {health_resp.status_code}). Cannot start measurement.")
+                    return
+            except Exception as e:
+                logger.error(f"Could not connect to the MaaS backend: {e}")
+                QMessageBox.critical(self, "Backend Unavailable", f"Could not connect to the MaaS backend at {self.server_url}.\n\n{e}")
+                return
 
         channels = self.get_selected_channels()
         if not channels:

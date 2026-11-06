@@ -5,6 +5,9 @@ from unittest.mock import Mock
 from PyQt6.QtWidgets import QMessageBox
 from ui.main_window import MainWindow
 
+# MainWindow fetches channels from MaaS on creation; never hit a live backend.
+pytestmark = pytest.mark.usefixtures("mock_maas_channels")
+
 
 def create_mock_jwt(role="admin", user_id=1):
     payload = json.dumps({"sub": user_id, "role": role})
@@ -132,7 +135,7 @@ def test_submit_delete_user_calls_maas_api_success(qtbot, mocker):
 
     mock_delete.assert_called_once()
     args, kwargs = mock_delete.call_args
-    assert "http://127.0.0.1:8000/auth/users/old_operator" in args[0]
+    assert f"{window.server_url}/auth/users/old_operator" in args[0]
     assert kwargs["headers"]["Authorization"] == f"Bearer {window.auth_token}"
 
     assert mock_info.called
@@ -237,7 +240,7 @@ def test_submit_reset_password_calls_maas_api_success(qtbot, mocker):
 
     mock_put.assert_called_once()
     args, kwargs = mock_put.call_args
-    assert "http://127.0.0.1:8000/auth/users/sushantyadav/password" in args[0]
+    assert f"{window.server_url}/auth/users/sushantyadav/password" in args[0]
     assert kwargs["json"]["new_password"] == "newsecurepass"
     assert kwargs["headers"]["Authorization"] == f"Bearer {window.auth_token}"
 

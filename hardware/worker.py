@@ -104,8 +104,8 @@ class CountRateWorker(QThread):
                 break
                 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Backend unavailable ({e}). Enabling mock mode for CountRateWorker.")
-                self.is_mock = True
+                logger.error(f"MaaS backend request failed ({e}). Cannot start CountRateWorker.")
+                self.booking_error = f"MaaS backend request failed: {e}"
                 break
             except Exception as e:
                 if attempt == 4:

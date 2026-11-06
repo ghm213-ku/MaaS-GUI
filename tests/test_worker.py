@@ -36,7 +36,7 @@ def test_worker_initialization_and_booking(mocker):
     
     # Assert post was called correctly
     mock_post.assert_called_once_with(
-        "http://127.0.0.1:8000/api/v1/channels/book",
+        f"{worker.base_url}/channels/book",
         json={"user_name": "testuser", "channel_numbers": [1, 2]},
         timeout=2
     )
@@ -101,7 +101,7 @@ def test_worker_run_measurement_start(mocker):
     # Assert measurement was started with correct payload
     mock_post.assert_called_once()
     args, kwargs = mock_post.call_args
-    assert args[0] == "http://127.0.0.1:8000/api/v1/measurements/count-rate-live"
+    assert args[0] == f"{worker.base_url}/measurements/count-rate-live"
     payload = kwargs["json"]
     assert payload["metadata"]["refresh_rate"] == 25
     assert payload["metadata"]["user_name"] == "testuser"
@@ -120,8 +120,8 @@ def test_worker_teardown(mocker):
     worker._perform_teardown()
     
     worker.ws.close.assert_called_once()
-    mock_delete.assert_called_once_with("http://127.0.0.1:8000/api/v1/measurements/test_id", timeout=10)
-    mock_post.assert_called_once_with("http://127.0.0.1:8000/api/v1/channels/release/testuser", timeout=10)
+    mock_delete.assert_called_once_with(f"{worker.base_url}/measurements/test_id", timeout=10)
+    mock_post.assert_called_once_with(f"{worker.base_url}/channels/release/testuser", timeout=10)
 
 
 # ================= CoincidencesWorker Tests =================
@@ -142,7 +142,7 @@ def test_coincidences_worker_initialization_with_list_of_lists(mocker):
     assert worker.channels == [1, 2, 3]
     assert worker.coincidence_window == 1500
     mock_post.assert_called_once_with(
-        "http://127.0.0.1:8000/api/v1/channels/book",
+        f"{worker.base_url}/channels/book",
         json={"user_name": "testuser", "channel_numbers": [1, 2, 3]},
         timeout=2,
     )
@@ -165,7 +165,7 @@ def test_coincidences_worker_initialization_with_1d_channels(mocker):
     assert worker.channels == [1, 2]
     assert worker.coincidence_window == 2000
     mock_post.assert_called_once_with(
-        "http://127.0.0.1:8000/api/v1/channels/book",
+        f"{worker.base_url}/channels/book",
         json={"user_name": "testuser", "channel_numbers": [1, 2]},
         timeout=2,
     )
@@ -203,7 +203,7 @@ def test_coincidences_worker_run_measurement_start(mocker):
 
     mock_post.assert_called_once()
     args, kwargs = mock_post.call_args
-    assert args[0] == "http://127.0.0.1:8000/api/v1/measurements/coincidences-live"
+    assert args[0] == f"{worker.base_url}/measurements/coincidences-live"
     payload = kwargs["json"]
     assert payload["measurement_type"] == "coincidences_live"
     assert payload["metadata"]["coincidences"] == [[1, 2]]
