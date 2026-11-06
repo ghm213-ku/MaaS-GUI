@@ -1658,14 +1658,9 @@ class MainWindow(QMainWindow):
                 box.setFocus()
                 return
 
-            if len(set(group_channels)) < len(group_channels):
-                QMessageBox.warning(
-                    self,
-                    "Invalid Selection",
-                    f"Duplicate channels detected in {box_label}: '{raw_text}'. Channels within a coincidence group must be distinct."
-                )
-                box.setFocus()
-                return
+            # Repeated channels are allowed, both within a group and across groups:
+            # Swabian's Time Tagger Coincidences API does not require distinct channels,
+            # so the GUI passes the groups through unchanged and lets MaaS decide.
 
             unselected = [ch for ch in group_channels if ch not in selected_channels]
             if unselected:

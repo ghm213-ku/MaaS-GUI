@@ -193,13 +193,15 @@ def test_coincidences_tab_validation_format_and_empty(qtbot, mocker):
     assert 'at least 2 channels' in mock_warn.call_args[0][2].lower()
     assert window.coinc_worker is None
 
-    # 4. Duplicate channels within group validation
+    # 4. Repeated channels within a group are allowed (no validation warning)
     mock_warn.reset_mock()
+    window.force_mock = True
     window.coinc_boxes[0].setText('1, 1')
     window.start_coincidences_measurement()
-    assert mock_warn.called
-    assert 'duplicate' in mock_warn.call_args[0][2].lower()
-    assert window.coinc_worker is None
+    assert not mock_warn.called
+    assert window.coinc_worker is not None
+    window.coinc_worker.stop()
+    window.coinc_worker.wait(1000)
 
 
 def test_coincidences_tab_validation_unselected_channels(qtbot, mocker):

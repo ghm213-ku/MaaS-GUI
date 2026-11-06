@@ -178,20 +178,49 @@ def test_validation_single_channel_rejected(qtbot, mocker):
     assert window.coinc_worker is None
 
 
-@pytest.mark.parametrize("duplicate_input", ["1, 1", "1, 2, 1", "2, 3, 2", "1, 1, 1"])
-def test_validation_duplicate_channels_in_group(qtbot, mocker, duplicate_input):
-    """Duplicate channel numbers in a group should be rejected."""
+@pytest.mark.parametrize("repeated_input,expected_group,expected_channels", [
+    ("1, 1", [1, 1], [1]),
+    ("1, 2, 1", [1, 2, 1], [1, 2]),
+    ("2, 3, 2", [2, 3, 2], [2, 3]),
+    ("1, 1, 1", [1, 1, 1], [1]),
+])
+def test_validation_repeated_channels_in_group_allowed(qtbot, mocker, repeated_input, expected_group, expected_channels):
+    """Repeated channels within a group are allowed and passed through unchanged."""
     window = MainWindow()
     qtbot.addWidget(window)
+    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
     mock_warn = mocker.patch("PyQt6.QtWidgets.QMessageBox.warning")
 
-    window.coinc_boxes[0].setText(duplicate_input)
+    window.coinc_boxes[0].setText(repeated_input)
     window.start_coincidences_measurement()
 
-    assert mock_warn.called
-    assert "duplicate" in mock_warn.call_args[0][2].lower()
-    assert window.coinc_worker is None
+    assert not mock_warn.called
+    assert window.coinc_worker is not None
+    assert window.coinc_worker.coincidences == [expected_group]
+    assert window.coinc_worker.channels == expected_channels
+    window.coinc_worker.stop()
+    window.coinc_worker.wait(1000)
+
+
+def test_validation_channel_shared_across_groups_allowed(qtbot, mocker):
+    """The same channel may appear in several groups (e.g. Swabian's [1, 2, 3] and [2, 3, 4])."""
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.force_mock = True
+    window.get_selected_channels = lambda: [1, 2, 3, 4]
+    mock_warn = mocker.patch("PyQt6.QtWidgets.QMessageBox.warning")
+
+    window.coinc_boxes[0].setText("1, 2, 3")
+    window.coinc_btn_add.click()
+    window.coinc_boxes[1].setText("2, 3, 4")
+    window.start_coincidences_measurement()
+
+    assert not mock_warn.called
+    assert window.coinc_worker.coincidences == [[1, 2, 3], [2, 3, 4]]
+    assert window.coinc_worker.channels == [1, 2, 3, 4]
+    window.coinc_worker.stop()
+    window.coinc_worker.wait(1000)
 
 
 # =========================================================================
