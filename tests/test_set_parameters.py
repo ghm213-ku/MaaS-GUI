@@ -10,7 +10,7 @@ pytestmark = pytest.mark.usefixtures("mock_maas_channels")
 def window(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
-    window.user_name_input.setText("testuser")
+    window.login_username = "testuser"
     return window
 
 
