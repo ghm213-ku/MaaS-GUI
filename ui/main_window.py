@@ -951,11 +951,6 @@ class MainWindow(QMainWindow):
 
         self.update_admin_tab_visibility()
         
-        # Set the fixed username
-        self.user_name_input.setText(self.login_username)
-        self.user_name_input.setReadOnly(True)
-        self.user_name_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px; background-color: #f0f0f0; color: #555;")
-
         # Load the current channel bookings from MaaS so the home page shows them right away
         self.fetch_booked_channels()
 
@@ -1313,6 +1308,10 @@ class MainWindow(QMainWindow):
             f"Checked {checked_at.strftime('%H:%M:%S')}" if checked_at else "")
         self._update_maas_details()
 
+    def current_user_name(self):
+        """The logged-in user's name, used for bookings and measurements."""
+        return self.login_username or "maas-gui-client"
+
     def build_channels_setup_tab(self):
         self.setup_tab = QWidget()
         layout = QVBoxLayout(self.setup_tab)
@@ -1320,15 +1319,8 @@ class MainWindow(QMainWindow):
         self.maas_status_panel = self.build_maas_status_panel()
         layout.addWidget(self.maas_status_panel)
         
-        # User Name input
+        # Book / Release buttons (the logged-in user is shown in the MaaS banner)
         user_layout = QHBoxLayout()
-        user_layout.addWidget(QLabel("User Name:"))
-        self.user_name_input = QLineEdit("maas-gui-client")
-        self.user_name_input.setFixedWidth(150)
-        self.user_name_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
-        user_layout.addWidget(self.user_name_input)
-        
-        user_layout.addSpacing(20)
         self.btn_book = QPushButton("Book")
         self.btn_book.clicked.connect(self.book_channels)
         user_layout.addWidget(self.btn_book)
@@ -1401,7 +1393,7 @@ class MainWindow(QMainWindow):
                 
                 channels_info = resp.json().get("channels", [])
                 logger.info(f"Fetched channel status from backend. Found {len(channels_info)} channels.")
-                current_user = self.user_name_input.text().strip()
+                current_user = self.current_user_name()
                 for ch_info in channels_info:
                     ch_num = ch_info.get("channel_number")
                     status = ch_info.get("status")
@@ -1430,7 +1422,7 @@ class MainWindow(QMainWindow):
                                 "before changing its trigger and delay.")
             return False
 
-        user_name = self.user_name_input.text().strip()
+        user_name = self.current_user_name()
         payload = {
             "measurement_type": "set_parameters",
             "duration_seconds": 0,
@@ -1461,13 +1453,13 @@ class MainWindow(QMainWindow):
     def book_channels(self):
         if getattr(self, 'force_mock', False):
             channels = self.get_selected_channels()
-            user_name = self.user_name_input.text().strip()
+            user_name = self.current_user_name()
             for ch in channels:
                 if ch in self.channel_nodes:
                     self.channel_nodes[ch].set_booked_by(user_name, True)
             return
             
-        user_name = self.user_name_input.text().strip()
+        user_name = self.current_user_name()
         if not user_name:
             QMessageBox.warning(self, "Invalid Input", "User Name cannot be empty.")
             return
@@ -1500,7 +1492,7 @@ class MainWindow(QMainWindow):
                     self.channel_nodes[ch].set_booked_by(None, False)
             return
             
-        user_name = self.user_name_input.text().strip()
+        user_name = self.current_user_name()
         if not user_name:
             return
             
@@ -2485,7 +2477,7 @@ class MainWindow(QMainWindow):
 
         # Initialize and start the background thread
         if self.worker is None:
-            user_name = self.user_name_input.text().strip()
+            user_name = self.current_user_name()
             if not user_name:
                 QMessageBox.warning(self, "Invalid Name", "Please enter a user name.")
                 return
@@ -2690,7 +2682,7 @@ class MainWindow(QMainWindow):
             self.hist_data_buffer = np.zeros(n_values)
             self.hist_x_buffer = np.zeros(n_values)
 
-        user_name = self.user_name_input.text().strip() or "maas-gui-client"
+        user_name = self.current_user_name()
         mode = self.hist_mode_combo.currentText()
 
         self.hist_worker = HistogramWorker(
@@ -2751,7 +2743,7 @@ class MainWindow(QMainWindow):
             self.hist2_data_buffer = np.zeros(n_values)
             self.hist2_x_buffer = np.zeros(n_values)
 
-        user_name = self.user_name_input.text().strip() or "maas-gui-client"
+        user_name = self.current_user_name()
         mode = self.hist2_mode_combo.currentText()
 
         self.hist2_worker = HistogramWorker(
