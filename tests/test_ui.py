@@ -191,3 +191,68 @@ def test_testing_mode_login_does_not_fetch_channels(qtbot, mocker):
     window.authenticate()
 
     mock_get.assert_not_called()
+
+
+def _window_with_bookings(qtbot, mocker, bookings, user="alice"):
+    """A MainWindow logged in as `user`, with channel bookings {channel: owner}."""
+    mock_get = mocker.patch("requests.Session.get")
+    resp = mocker.Mock()
+    resp.status_code = 200
+    resp.json.return_value = {"channels": [
+        {"channel_number": ch, "status": "booked", "user_name": owner}
+        for ch, owner in bookings.items()
+    ]}
+    mock_get.return_value = resp
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.login_username = user
+    window.fetch_booked_channels()
+    return window
+
+
+def test_release_sends_only_selected_own_channels(qtbot, mocker):
+    """Release frees only the selected channels and never re-books the others."""
+    window = _window_with_bookings(qtbot, mocker, {1: "alice", 2: "alice", 3: "alice", 4: "bob"})
+    mock_post = mocker.patch("requests.Session.post")
+    mock_post.return_value = mocker.Mock(status_code=200)
+
+    # Your own bookings start selected; deselect 2 to keep it. Bob's channel 4
+    # is ignored even if marked selected, because it is not yours.
+    window.channel_nodes[2].node.is_active = False
+    window.channel_nodes[4].node.is_active = True
+
+    window.release_channels()
+
+    assert mock_post.call_count == 1
+    url = mock_post.call_args.args[0]
+    assert url.endswith("/channels/release/alice")
+    assert mock_post.call_args.kwargs["json"] == {"channel_numbers": [1, 3]}
+    assert not any("/channels/book" in str(c.args[0]) for c in mock_post.call_args_list)
+
+
+def test_release_with_no_own_channel_selected_sends_nothing(qtbot, mocker):
+    window = _window_with_bookings(qtbot, mocker, {1: "alice", 2: "bob"})
+    mock_post = mocker.patch("requests.Session.post")
+    warn = mocker.patch("ui.main_window.QMessageBox.warning")
+    window.channel_nodes[1].node.is_active = False
+    window.channel_nodes[2].node.is_active = True
+
+    window.release_channels()
+
+    mock_post.assert_not_called()
+    warn.assert_called_once()
+
+
+def test_release_conflict_shows_backend_detail(qtbot, mocker):
+    """A 409 from MaaS (channel not booked by you) is shown to the user."""
+    window = _window_with_bookings(qtbot, mocker, {1: "alice"})
+    resp = mocker.Mock(status_code=409, text="raw")
+    resp.json.return_value = {"detail": "Cannot release channels [1] - not booked by alice"}
+    mocker.patch("requests.Session.post", return_value=resp)
+    warn = mocker.patch("ui.main_window.QMessageBox.warning")
+    window.channel_nodes[1].node.is_active = True
+
+    window.release_channels()
+
+    assert "not booked by alice" in warn.call_args.args[2]
