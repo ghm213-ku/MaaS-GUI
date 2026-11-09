@@ -277,8 +277,9 @@ def _free_running_window(qtbot, n_bins, n_channels=1):
     return window
 
 
-def test_free_running_plot_averages_frames(qtbot):
-    """Free Running shows the per-bin mean over all frames received."""
+def test_free_running_plot_accumulates_once_full(qtbot):
+    """Once the buffer is full, Free Running sums every frame per bin, so
+    high-count bins keep pulling ahead of low-count bins."""
     import numpy as np
     window = _free_running_window(qtbot, 4)
 
@@ -286,13 +287,14 @@ def test_free_running_plot_averages_frames(qtbot):
     window.update_plot(np.array([[5, 1, 0, 2]]))
     window.update_plot(np.array([[2, 1, 3, 2]]))
 
-    assert list(window.data_buffers[0]) == [4, 1, 1, 2]
-    assert list(window.plot_curves[0].yData) == [4, 1, 1, 2]
+    assert list(window.data_buffers[0]) == [12, 3, 3, 6]
+    assert list(window.plot_curves[0].yData) == [12, 3, 3, 6]
+    assert "accumulated over 3 frames" in window.plot_widget.plotItem.titleLabel.text
 
 
-def test_free_running_plot_not_biased_by_fill_padding(qtbot):
-    """While the rolling buffer fills, left bins are zero padding. They must
-    not be averaged in, or the plot ramps up towards the right."""
+def test_free_running_waits_for_buffer_to_fill(qtbot):
+    """While the rolling buffer fills, left bins are zero padding. Nothing is
+    added until it is full, so the totals have no ramp towards the right."""
     import numpy as np
     window = _free_running_window(qtbot, 4, n_channels=2)
 
@@ -300,11 +302,30 @@ def test_free_running_plot_not_biased_by_fill_padding(qtbot):
     window.update_plot(np.array([[0, 0, 0, 3], [0, 0, 0, 0]]))
     window.update_plot(np.array([[0, 0, 3, 3], [0, 0, 0, 0]]))
     window.update_plot(np.array([[0, 3, 3, 3], [0, 0, 0, 0]]))
+    # Still filling: the live snapshot is shown and the status says so.
+    assert list(window.data_buffers[0]) == [0, 3, 3, 3]
+    assert "filling buffer" in window.plot_widget.plotItem.titleLabel.text
+    assert "75%" in window.plot_widget.plotItem.titleLabel.text
+
     window.update_plot(np.array([[3, 3, 3, 3], [0, 0, 0, 0]]))
     window.update_plot(np.array([[3, 3, 3, 3], [0, 0, 0, 0]]))
 
-    assert list(window.data_buffers[0]) == [3, 3, 3, 3]
+    assert list(window.data_buffers[0]) == [6, 6, 6, 6]
     assert list(window.data_buffers[1]) == [0, 0, 0, 0]
+    assert window.plot_widget.getAxis('left').labelText == "Accumulated counts / bin"
+
+
+def test_free_running_fill_detected_by_elapsed_time(qtbot):
+    """At low rates real bins can be zero; elapsed time still ends the fill."""
+    import numpy as np
+    window = _free_running_window(qtbot, 4)
+    window.fr_binwidth_s = 1e-9  # buffer fills almost instantly
+
+    window.update_plot(np.array([[0, 0, 1, 0]]))
+    window.update_plot(np.array([[0, 0, 1, 0]]))
+
+    assert window.data_buffers[0].sum() >= 1
+    assert "accumulated" in window.plot_widget.plotItem.titleLabel.text
 
 
 def test_free_running_y_axis_label(qtbot):
@@ -312,8 +333,7 @@ def test_free_running_y_axis_label(qtbot):
     qtbot.addWidget(window)
     window.mode_combo.setCurrentText("Single")
     window.mode_combo.setCurrentText("Free Running")
-    label = window.plot_widget.getAxis('left').labelText
-    assert "Mean counts / bin" in label
+    assert window.plot_widget.getAxis('left').labelText == "Accumulated counts / bin"
     window.mode_combo.setCurrentText("Single")
     assert window.plot_widget.getAxis('left').labelText == "Counts / bin"
 

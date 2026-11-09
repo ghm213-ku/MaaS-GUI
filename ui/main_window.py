@@ -2576,11 +2576,12 @@ class MainWindow(QMainWindow):
             self.plot_widget.setLabel('bottom', 'Bin Index')
             self.plot_widget.setLabel('left', self._counter_y_label(mode))
             self.plot_widget.setMouseEnabled(x=True, y=True)
+        self.plot_widget.setTitle("Counts")
 
     @staticmethod
     def _counter_y_label(mode):
         if mode == "Free Running":
-            return 'Mean counts / bin (averaged over frames)'
+            return 'Accumulated counts / bin'
         return 'Counts / bin'
 
     def toggle_zoom(self, checked):
@@ -2679,13 +2680,15 @@ class MainWindow(QMainWindow):
                 self.data_buffers = [[] for _ in channels]
             else:
                 self.data_buffers = [np.zeros(n_values) for _ in channels]
-                # Free Running: per-bin running sums and the number of frames in
-                # which each bin held real data (not the rolling buffer's padding).
+                # Free Running: per-bin running sums, started once the rolling
+                # buffer has filled (see _accumulate_free_running).
                 self.fr_sums = [np.zeros(n_values) for _ in channels]
-                self.fr_counts = np.zeros(n_values)
+                self.fr_frames = 0
                 self.fr_fill_start = n_values
                 self.fr_start_time = None
                 self.fr_binwidth_s = binwidth / 1e12
+                self.plot_widget.setLabel('left', self._counter_y_label(mode))
+            self.plot_widget.setTitle("Counts")
 
             self.active_channels_list = channels
             
@@ -2804,20 +2807,22 @@ class MainWindow(QMainWindow):
         self.worker = None
 
     def _accumulate_free_running(self, rates_2d):
-        """Average each bin over the frames in which it held real data.
+        """Sum frames per bin, but only once the rolling buffer has filled.
 
         Each frame is a snapshot of the Counter's rolling buffer, newest bin
         last, zero-padded on the left until the buffer has filled. Summing
-        snapshots directly would favour right-hand bins (they get data from the
-        first frame), so each bin is divided by its own number of filled frames.
+        while it fills would favour right-hand bins (they get data from the
+        first frame), so frames are only added once every bin holds real data;
+        until then the latest snapshot is shown. After that every bin gets one
+        value per frame, so high-count bins pull ahead of low-count ones.
         """
         import time
         rates_2d = np.asarray(rates_2d, dtype=float)
         n = rates_2d.shape[1]
-        if getattr(self, "fr_sums", None) is None or len(self.fr_counts) != n \
+        if getattr(self, "fr_sums", None) is None or len(self.fr_sums[0]) != n \
                 or len(self.fr_sums) != len(self.data_buffers):
             self.fr_sums = [np.zeros(n) for _ in self.data_buffers]
-            self.fr_counts = np.zeros(n)
+            self.fr_frames = 0
             self.fr_fill_start = n
             self.fr_start_time = None
         now = time.monotonic()
@@ -2835,14 +2840,22 @@ class MainWindow(QMainWindow):
             start = min(start, n - int((now - self.fr_start_time) / binwidth_s))
         self.fr_fill_start = max(0, min(self.fr_fill_start, start))
 
-        s = self.fr_fill_start
-        self.fr_counts[s:] += 1
-        filled = self.fr_counts > 0
-        for i in range(min(len(self.fr_sums), rates_2d.shape[0])):
-            self.fr_sums[i][s:] += rates_2d[i][s:]
-            mean = np.zeros(n)
-            mean[filled] = self.fr_sums[i][filled] / self.fr_counts[filled]
-            self.data_buffers[i] = mean
+        n_ch = min(len(self.fr_sums), rates_2d.shape[0])
+        if self.fr_fill_start > 0:
+            # Still filling: show the live snapshot, add nothing yet.
+            for i in range(n_ch):
+                self.data_buffers[i] = rates_2d[i].copy()
+            pct = int(100 * (n - self.fr_fill_start) / n)
+            self.plot_widget.setTitle(f"Counts — filling buffer… {pct}%")
+            self.plot_widget.setLabel('left', 'Counts / bin (live, buffer filling)')
+            return
+
+        self.fr_frames += 1
+        for i in range(n_ch):
+            self.fr_sums[i] += rates_2d[i]
+            self.data_buffers[i] = self.fr_sums[i].copy()
+        self.plot_widget.setTitle(f"Counts — accumulated over {self.fr_frames} frames")
+        self.plot_widget.setLabel('left', self._counter_y_label("Free Running"))
 
     def update_plot(self, rates_2d):
         mode = self.mode_combo.currentText()
@@ -2851,7 +2864,7 @@ class MainWindow(QMainWindow):
         for i in range(len(self.plot_curves)):
             if i < rates_2d.shape[0]:
                 if mode == "Free Running":
-                    pass  # data_buffers already holds the per-bin mean
+                    pass  # data_buffers already set by _accumulate_free_running
                 elif mode == "Single":
                     # Each frame is a full snapshot of the Time Tagger Counter's
                     # rolling buffer: show the latest snapshot as-is.
@@ -2933,6 +2946,9 @@ class MainWindow(QMainWindow):
         self.plot_curves = []
         self.data_buffers = []
         self.fr_sums = None
+        self.plot_widget.setTitle("Counts")
+        if self.mode_combo.currentText() != "Repeating":
+            self.plot_widget.setLabel('left', self._counter_y_label(self.mode_combo.currentText()))
         self.active_channels_list = []
         
         # Keep persistent items
