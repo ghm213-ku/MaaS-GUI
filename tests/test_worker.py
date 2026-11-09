@@ -384,7 +384,48 @@ def test_coincidences_worker_mock_mode_multiple_streams(mocker):
     data_received, stream_received = run_until_first_frame(worker, mocker)
 
     assert len(data_received) == 1
-    assert data_received[0].shape == (3, 1)
+    # Free Running mock mimics the backend Counter: one rolling buffer of n_values bins per group.
+    assert data_received[0].shape == (3, worker.n_values)
     assert [idx for idx, _ in stream_received] == [0, 1, 2]
+
+
+def test_coincidences_worker_sends_binning_and_reads_counter_buffers(mocker):
+    """binwidth / n_values go to MaaS, and each stream's "data" buffer (not its
+    scalar "rate") becomes that group's row."""
+    mocker.patch("requests.Session.get")
+    mocker.patch("requests.Session.post")
+    worker = CoincidencesWorker(
+        coincidences=[[1, 2], [2, 3]],
+        user_name="testuser",
+        binwidth=int(1e10),
+        n_values=3,
+    )
+
+    mock_post = mocker.patch("requests.Session.post")
+    mock_post.return_value.json.return_value = {"measurement_id": "buf_id"}
+    mock_ws_instance = mocker.patch("websocket.WebSocket").return_value
+
+    received = []
+    worker.newDataReady.connect(lambda arr: received.append(arr))
+
+    def mock_recv():
+        worker.running = False
+        return json.dumps({
+            "type": "coincidences_live",
+            "streams": [
+                {"stream_index": 0, "coincidence": [1, 2], "rate": 300.0, "data": [1.0, 2.0, 3.0]},
+                {"stream_index": 1, "coincidence": [2, 3], "rate": 600.0, "data": [4.0, 5.0, 6.0]},
+            ],
+            "data": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+        })
+
+    mock_ws_instance.recv.side_effect = mock_recv
+    mocker.patch.object(worker, "_perform_teardown")
+    worker.run()
+
+    metadata = mock_post.call_args.kwargs["json"]["metadata"]
+    assert metadata["binwidth"] == int(1e10)
+    assert metadata["n_values"] == 3
+    assert received[0].tolist() == [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
 
 

@@ -294,14 +294,12 @@ class SITimeAxisItem(pg.AxisItem):
 
 
 class MainWindow(QMainWindow):
-    # Coincidences time steps as (label, refresh rate in Hz). Only steps that
-    # are a whole number of Hz are offered, since the backend takes an int.
-    COINC_TIME_STEPS = [
-        ("10 ms", 100), ("20 ms", 50), ("40 ms", 25), ("50 ms", 20),
-        ("100 ms", 10), ("200 ms", 5), ("500 ms", 2), ("1 s", 1),
-    ]
-    COINC_DEFAULT_REFRESH_HZ = 25
-    COINC_DEFAULT_POINTS = 100
+    # Live coincidences: the backend feeds the coincidence virtual channels into
+    # a TimeTagger.Counter(binwidth, n_values) and publishes its whole rolling
+    # buffer at the refresh rate.
+    COINC_DEFAULT_BINWIDTH = "1e9"   # ps (1 ms)
+    COINC_DEFAULT_N_VALUES = "1000"
+    COINC_REFRESH_HZ = 25
 
     def __init__(self, force_mock=False, server_ip=None):
         super().__init__()
@@ -1704,27 +1702,22 @@ class MainWindow(QMainWindow):
         self.coinc_binwidth_input.setToolTip("Coincidence window in picoseconds (default: 1000 ps = 1 ns)")
         controls.addWidget(self.coinc_binwidth_input)
 
-        # Time between plotted points. The backend's live coincidences stream
-        # publishes one value per refresh period (1 / refresh_rate) and ignores
-        # binwidth / n_values, so the step is set through the refresh rate,
-        # which must be a whole number of Hz (1-100).
+        # Counter binning for the coincidence virtual channels (sent to MaaS as
+        # binwidth / n_values). Press Enter to apply while running.
         controls.addSpacing(10)
-        controls.addWidget(QLabel("Time step:"))
-        self.coinc_step_combo = QComboBox()
-        for label, hz in self.COINC_TIME_STEPS:
-            self.coinc_step_combo.addItem(label, hz)
-        self.coinc_step_combo.setCurrentIndex(
-            [hz for _, hz in self.COINC_TIME_STEPS].index(self.COINC_DEFAULT_REFRESH_HZ))
-        self.coinc_step_combo.setToolTip("Time between plotted points (sets the backend refresh rate)")
-        self.coinc_step_combo.currentIndexChanged.connect(self.on_coinc_time_step_changed)
-        controls.addWidget(self.coinc_step_combo)
+        controls.addWidget(QLabel("Bin width (ps):"))
+        self.coinc_bin_input = QLineEdit(self.COINC_DEFAULT_BINWIDTH)
+        self.coinc_bin_input.setMaximumWidth(80)
+        self.coinc_bin_input.setToolTip("Time step: width of each counter bin in picoseconds (1e9 ps = 1 ms)")
+        self.coinc_bin_input.returnPressed.connect(self.quick_restart_coincidences)
+        controls.addWidget(self.coinc_bin_input)
 
-        controls.addWidget(QLabel("Points:"))
-        self.coinc_points_input = QLineEdit(str(self.COINC_DEFAULT_POINTS))
-        self.coinc_points_input.setMaximumWidth(60)
-        self.coinc_points_input.setToolTip("Number of most recent points kept on the plot")
-        self.coinc_points_input.editingFinished.connect(self.on_coinc_points_changed)
-        controls.addWidget(self.coinc_points_input)
+        controls.addWidget(QLabel("Bins:"))
+        self.coinc_nvalues_input = QLineEdit(self.COINC_DEFAULT_N_VALUES)
+        self.coinc_nvalues_input.setMaximumWidth(60)
+        self.coinc_nvalues_input.setToolTip("Number of bins in the rolling buffer (time span = bins x bin width)")
+        self.coinc_nvalues_input.returnPressed.connect(self.quick_restart_coincidences)
+        controls.addWidget(self.coinc_nvalues_input)
 
         controls.addSpacing(20)
         controls.addWidget(QLabel("Channels:"))
@@ -1754,13 +1747,10 @@ class MainWindow(QMainWindow):
         
         self.coinc_plot_widget = pg.PlotWidget(axisItems={'bottom': SITimeAxisItem(orientation='bottom')})
         self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.coinc_plot_widget.setLabel('bottom', 'Time (s)')
-        # The backend uses TimeTagger.Countrate, which reports the average
-        # rate in counts/s since the measurement started.
-        self.coinc_plot_widget.setLabel('left', 'Avg. coincidence rate (counts/s)')
-        self.coinc_max_points = self.COINC_DEFAULT_POINTS
-        self.coinc_refresh_hz = self.COINC_DEFAULT_REFRESH_HZ
-        self.coinc_xdata_streams = []
+        self.coinc_plot_widget.setLabel('bottom', 'Time (s, 0 = latest bin)')
+        self.coinc_plot_widget.setLabel('left', 'Coincidences / bin')
+        self.coinc_binwidth_ps = int(float(self.COINC_DEFAULT_BINWIDTH))
+        self.coinc_xdata = np.array([])
         self.coinc_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = []
@@ -1792,48 +1782,45 @@ class MainWindow(QMainWindow):
 
         self.coinc_worker = None
 
-    def on_coinc_time_step_changed(self, _index=None):
-        # The refresh rate is fixed when the backend measurement starts, so a
-        # new step only takes effect by restarting a running measurement.
-        if self.coinc_worker is not None:
-            self._retire_worker(self.coinc_worker)
-            self.coinc_worker = None
-            self.start_coincidences_measurement()
+    def quick_restart_coincidences(self):
+        """Apply new binning to a running measurement (binning is fixed once
+        the backend Counter is created, so this means a restart)."""
+        if self.coinc_worker is None:
+            return
+        if self._parse_coinc_binning() is None:
+            self._warn_invalid_coinc_binning()
+            return
+        self._retire_worker(self.coinc_worker)
+        self.coinc_worker = None
+        self.start_coincidences_measurement()
 
-    def _parse_coinc_points(self):
+    def _parse_coinc_binning(self):
+        """Return (binwidth_ps, n_values) from the inputs, or None if invalid."""
         try:
-            points = int(self.coinc_points_input.text().strip())
+            binwidth = float(self.coinc_bin_input.text().strip())
+            n_values = int(self.coinc_nvalues_input.text().strip())
         except ValueError:
             return None
-        return points if points >= 2 else None
+        if not np.isfinite(binwidth) or binwidth < 1 or binwidth != int(binwidth) or n_values < 1:
+            return None
+        return int(binwidth), n_values
 
-    def on_coinc_points_changed(self):
-        points = self._parse_coinc_points()
-        if points is None:
-            self.coinc_points_input.setText(str(self.coinc_max_points))
-            return
-        self.coinc_max_points = points
-        for i in range(len(self.coinc_ydata_streams)):
-            self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-points:]
-            if i < len(self.coinc_xdata_streams):
-                self.coinc_xdata_streams[i] = self.coinc_xdata_streams[i][-points:]
-            if i < len(self.coinc_plot_curves):
-                self.coinc_plot_curves[i].setData(self.coinc_xdata_streams[i], self.coinc_ydata_streams[i])
+    def _warn_invalid_coinc_binning(self):
+        QMessageBox.warning(
+            self,
+            "Invalid Input",
+            "Bin width must be a positive whole number of picoseconds (e.g. 1e9 = 1 ms) "
+            "and Bins must be a positive integer."
+        )
 
-    def _append_coinc_point(self, i, val):
-        """Append one value to stream i, stamped with its elapsed time in seconds."""
-        if len(self.coinc_xdata_streams) != len(self.coinc_ydata_streams):
-            self.coinc_xdata_streams = [[] for _ in self.coinc_ydata_streams]
-            self.coinc_frame_counts = [0] * len(self.coinc_ydata_streams)
-        step_s = 1.0 / self.coinc_refresh_hz
-        self.coinc_frame_counts[i] += 1
-        self.coinc_xdata_streams[i].append(self.coinc_frame_counts[i] * step_s)
-        self.coinc_ydata_streams[i].append(val)
-        n = self.coinc_max_points
-        if len(self.coinc_ydata_streams[i]) > n:
-            self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-n:]
-            self.coinc_xdata_streams[i] = self.coinc_xdata_streams[i][-n:]
-        self.coinc_plot_curves[i].setData(self.coinc_xdata_streams[i], self.coinc_ydata_streams[i])
+    def _set_coinc_buffer(self, i, row):
+        """Show stream i's latest Counter buffer (oldest bin first), with x in
+        seconds relative to the newest bin."""
+        row = np.asarray(row, dtype=float).ravel()
+        if len(self.coinc_xdata) != len(row):
+            self.coinc_xdata = (np.arange(len(row)) - (len(row) - 1)) * (self.coinc_binwidth_ps * 1e-12)
+        self.coinc_ydata_streams[i] = row
+        self.coinc_plot_curves[i].setData(self.coinc_xdata, row)
 
     def coinc_toggle_zoom(self, checked):
         mode = pg.ViewBox.RectMode if checked else pg.ViewBox.PanMode
@@ -1978,6 +1965,12 @@ class MainWindow(QMainWindow):
 
             coincidences.append(group_channels)
 
+        binning = self._parse_coinc_binning()
+        if binning is None:
+            self._warn_invalid_coinc_binning()
+            return
+        binwidth_ps, n_values = binning
+
         self.coinc_plot_widget.clear()
         self._clear_coinc_legend()
         self.coinc_plot_widget.enableAutoRange()
@@ -1985,15 +1978,9 @@ class MainWindow(QMainWindow):
         palette = ['#00ff00', '#00e5ff', '#ffaa00', '#ff00aa', '#ffff00', '#aa00ff', '#ff5500', '#00aaff']
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = [[] for _ in coincidences]
-        self.coinc_xdata_streams = [[] for _ in coincidences]
-        self.coinc_frame_counts = [0] * len(coincidences)
         self.coinc_groups = coincidences
-        self.coinc_refresh_hz = int(self.coinc_step_combo.currentData())
-        points = self._parse_coinc_points()
-        if points is not None:
-            self.coinc_max_points = points
-        else:
-            self.coinc_points_input.setText(str(self.coinc_max_points))
+        self.coinc_binwidth_ps = binwidth_ps
+        self.coinc_xdata = np.array([])
 
         for idx, group in enumerate(coincidences):
             color = palette[idx % len(palette)]
@@ -2018,7 +2005,9 @@ class MainWindow(QMainWindow):
             coincidences=coincidences,
             user_name=self.login_username,
             coincidence_window=window_ps,
-            refresh_rate=self.coinc_refresh_hz,
+            binwidth=binwidth_ps,
+            n_values=n_values,
+            refresh_rate=self.COINC_REFRESH_HZ,
             auth_token=self.auth_token,
             is_mock=self.force_mock,
             server_ip=self.server_ip)
@@ -2069,7 +2058,7 @@ class MainWindow(QMainWindow):
             
         self.coinc_ydata = []
         self.coinc_ydata_streams = []
-        self.coinc_xdata_streams = []
+        self.coinc_xdata = np.array([])
         self.coinc_plot_curves = []
         self.coinc_plot_widget.clear()
         self._clear_coinc_legend()
@@ -2096,29 +2085,29 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
             self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
 
+        # Each frame is (n_groups, n_values): the full Counter buffer per group.
         arr = np.array(data, dtype=float)
         if arr.ndim == 0:
             arr = arr.reshape(1, 1)
         elif arr.ndim == 1:
-            if arr.shape[0] == len(self.coinc_plot_curves):
+            if len(self.coinc_plot_curves) > 1 and arr.shape[0] == len(self.coinc_plot_curves):
                 arr = arr.reshape(-1, 1)
             else:
                 arr = arr.reshape(1, -1)
 
         for i in range(len(self.coinc_plot_curves)):
             if i < arr.shape[0]:
-                self._append_coinc_point(i, float(np.sum(arr[i])))
+                self._set_coinc_buffer(i, arr[i])
 
         self.coinc_ydata = self.coinc_ydata_streams[0] if self.coinc_ydata_streams else []
 
     def update_coincidences_stream_plot(self, stream_index, stream_data):
-        import numpy as np
         if not hasattr(self, 'coinc_plot_curves') or stream_index >= len(self.coinc_plot_curves):
             return
         if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
             self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
 
-        self._append_coinc_point(stream_index, float(np.sum(stream_data)))
+        self._set_coinc_buffer(stream_index, stream_data)
         if stream_index == 0:
             self.coinc_ydata = self.coinc_ydata_streams[0]
 

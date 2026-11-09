@@ -161,7 +161,9 @@ class CoincidencesWorker(QThread):
                             # Handle dedicated per-stream message: {"type": "coincidences_live_stream", "stream_index": i, "rate": ..., "data": ...}
                             if isinstance(msg_data, dict) and msg_data.get("type") == "coincidences_live_stream":
                                 s_idx = int(msg_data.get("stream_index", 0))
-                                s_val = msg_data.get("rate", msg_data.get("data", 0.0))
+                                # "data" is the stream's full Counter buffer (n_values bins);
+                                # "rate" (counts/s of the latest bin) is only a fallback.
+                                s_val = msg_data.get("data", msg_data.get("rate", 0.0))
                                 s_arr = np.array([s_val], dtype=float).flatten()
                                 self.streamDataReady.emit(s_idx, s_arr)
                                 
@@ -175,7 +177,8 @@ class CoincidencesWorker(QThread):
                             if isinstance(msg_data, dict):
                                 if "streams" in msg_data and isinstance(msg_data["streams"], list) and len(msg_data["streams"]) > 0:
                                     self.latest_streams = msg_data["streams"]
-                                    rates_raw = [s.get("rate", s.get("data", 0.0)) for s in self.latest_streams]
+                                    # Each stream's "data" is its Counter buffer: counts per bin, oldest first.
+                                    rates_raw = [s.get("data", s.get("rate", 0.0)) for s in self.latest_streams]
                                 elif "data" in msg_data:
                                     rates_raw = msg_data.get("data", [])
                                 else:
@@ -247,6 +250,11 @@ class CoincidencesWorker(QThread):
         num_items = len(self.coincidences) if getattr(self, 'coincidences', None) else (len(self.channels) if getattr(self, 'channels', None) else 1)
         if num_items == 0:
             num_items = 1
+
+        if self.mode not in ("Repeating", "Single"):
+            self._run_mock_rolling(num_items, refresh_interval)
+            return
+
         while self.running:
             if not self.is_paused:
                 if self.mode == "Repeating":
@@ -272,6 +280,30 @@ class CoincidencesWorker(QThread):
                     self.running = False
                     break
                     
+            time.sleep(refresh_interval)
+
+    def _run_mock_rolling(self, num_items, refresh_interval):
+        """Mimic the backend's live Counter: a rolling buffer of n_values bins
+        of binwidth ps (oldest first) that gains one bin per elapsed binwidth."""
+        import time
+        n_values = max(1, int(self.n_values))
+        binwidth_s = max(self.binwidth, 1) * 1e-12
+        rates = [500.0 + i * 350.0 for i in range(num_items)]  # coincidences / s
+        buffer = np.zeros((num_items, n_values))
+        start_time = time.time()
+        bins_done = 0
+        while self.running:
+            bins_now = int((time.time() - start_time) / binwidth_s)
+            new_bins = min(bins_now - bins_done, n_values)
+            bins_done = bins_now
+            if new_bins > 0:
+                buffer = np.roll(buffer, -new_bins, axis=1)
+                for i in range(num_items):
+                    buffer[i, -new_bins:] = np.random.poisson(rates[i] * binwidth_s, size=new_bins)
+            if not self.is_paused:
+                self.newDataReady.emit(buffer.copy())
+                for i in range(num_items):
+                    self.streamDataReady.emit(i, buffer[i].copy())
             time.sleep(refresh_interval)
 
     def _perform_teardown(self):

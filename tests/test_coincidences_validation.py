@@ -431,24 +431,18 @@ def test_coincidences_multi_stream_plot_update(qtbot):
 
     window.start_coincidences_measurement()
 
-    # Send 2D data: row 0 for stream 0, row 1 for stream 1
-    mock_payload = np.array([[1542.0], [28.5]])
-    window.update_coincidences_plot(mock_payload)
+    # Each frame is the full Counter buffer per group (n_groups x n_values).
+    window.update_coincidences_plot(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
 
-    assert len(window.coinc_ydata_streams[0]) == 1
-    assert len(window.coinc_ydata_streams[1]) == 1
-    assert window.coinc_ydata_streams[0][0] == 1542.0
-    assert window.coinc_ydata_streams[1][0] == 28.5
-    assert window.coinc_ydata[0] == 1542.0
+    assert list(window.coinc_ydata_streams[0]) == [1.0, 2.0, 3.0]
+    assert list(window.coinc_ydata_streams[1]) == [4.0, 5.0, 6.0]
+    assert window.coinc_ydata[0] == 1.0
 
-    # Send a second frame
-    mock_payload_2 = np.array([[1600.0], [35.0]])
-    window.update_coincidences_plot(mock_payload_2)
+    # The next frame replaces the buffer (the backend sends the rolled buffer).
+    window.update_coincidences_plot(np.array([[2.0, 3.0, 7.0], [5.0, 6.0, 8.0]]))
 
-    assert len(window.coinc_ydata_streams[0]) == 2
-    assert len(window.coinc_ydata_streams[1]) == 2
-    assert window.coinc_ydata_streams[0][-1] == 1600.0
-    assert window.coinc_ydata_streams[1][-1] == 35.0
+    assert list(window.coinc_ydata_streams[0]) == [2.0, 3.0, 7.0]
+    assert list(window.coinc_ydata_streams[1]) == [5.0, 6.0, 8.0]
 
 
 def test_coincidences_individual_stream_update(qtbot):
@@ -536,61 +530,65 @@ def test_coincidences_zoom_toggle_switches_mouse_mode(qtbot):
     assert vb.state['mouseMode'] == pg.ViewBox.PanMode
 
 
-def test_coincidences_time_step_sets_refresh_rate_and_x_axis(qtbot, fake_workers):
-    """The chosen time step is sent as the refresh rate and spaces the x values in seconds."""
+def test_coincidences_binning_sent_to_worker_and_x_axis_in_seconds(qtbot, fake_workers):
+    """Bin width / Bins go to the worker; x runs from -(n-1) bins to 0 in seconds."""
     import numpy as np
     window = MainWindow()
     qtbot.addWidget(window)
     window.get_selected_channels = lambda: [1, 2]
     window.coinc_boxes[0].setText("1, 2")
+    window.coinc_bin_input.setText("1e11")   # 100 ms
+    window.coinc_nvalues_input.setText("4")
 
-    window.coinc_step_combo.setCurrentIndex(window.coinc_step_combo.findText("100 ms"))
     window.start_coincidences_measurement()
-    assert coinc_kwargs(fake_workers)["refresh_rate"] == 10
+    kwargs = coinc_kwargs(fake_workers)
+    assert kwargs["binwidth"] == int(1e11)
+    assert kwargs["n_values"] == 4
+    assert kwargs["refresh_rate"] == MainWindow.COINC_REFRESH_HZ
 
-    for v in (1.0, 2.0, 3.0):
-        window.update_coincidences_plot(np.array([[v]]))
-    assert window.coinc_xdata_streams[0] == pytest.approx([0.1, 0.2, 0.3])
-    assert window.coinc_ydata_streams[0] == [1.0, 2.0, 3.0]
+    window.update_coincidences_plot(np.array([[1.0, 2.0, 3.0, 4.0]]))
+    assert window.coinc_xdata.tolist() == pytest.approx([-0.3, -0.2, -0.1, 0.0])
+    assert list(window.coinc_ydata_streams[0]) == [1.0, 2.0, 3.0, 4.0]
 
 
-def test_coincidences_changing_time_step_restarts_running_measurement(qtbot, fake_workers):
-    import numpy as np
+@pytest.mark.parametrize("binwidth, n_values", [
+    ("abc", "10"), ("0", "10"), ("-5", "10"), ("1.5", "10"), ("inf", "10"),
+    ("1e9", "0"), ("1e9", "x"), ("1e9", "2.5"),
+])
+def test_coincidences_invalid_binning_rejected(qtbot, mocker, fake_workers, binwidth, n_values):
+    warn = mocker.patch.object(QMessageBox, "warning")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.get_selected_channels = lambda: [1, 2]
+    window.coinc_boxes[0].setText("1, 2")
+    window.coinc_bin_input.setText(binwidth)
+    window.coinc_nvalues_input.setText(n_values)
+
+    window.start_coincidences_measurement()
+
+    warn.assert_called_once()
+    assert window.coinc_worker is None
+    fake_workers.coincidences.assert_not_called()
+
+
+def test_coincidences_enter_in_binning_restarts_running_measurement(qtbot, fake_workers):
     window = MainWindow()
     qtbot.addWidget(window)
     window.get_selected_channels = lambda: [1, 2]
     window.coinc_boxes[0].setText("1, 2")
     window.start_coincidences_measurement()
     old_worker = window.coinc_worker
-    window.update_coincidences_plot(np.array([[5.0]]))
 
-    window.coinc_step_combo.setCurrentIndex(window.coinc_step_combo.findText("1 s"))
+    window.coinc_bin_input.setText("1e12")
+    window.coinc_bin_input.returnPressed.emit()
 
     assert window.coinc_worker is not None and window.coinc_worker is not old_worker
-    assert coinc_kwargs(fake_workers)["refresh_rate"] == 1
-    assert window.coinc_ydata_streams == [[]]
+    assert coinc_kwargs(fake_workers)["binwidth"] == int(1e12)
 
 
-def test_coincidences_points_limit_history(qtbot):
-    import numpy as np
+def test_coincidences_enter_in_binning_does_nothing_when_stopped(qtbot, fake_workers):
     window = MainWindow()
     qtbot.addWidget(window)
-    window.get_selected_channels = lambda: [1, 2]
-    window.coinc_boxes[0].setText("1, 2")
-    window.coinc_points_input.setText("5")
-    window.start_coincidences_measurement()
-
-    for v in range(8):
-        window.update_coincidences_plot(np.array([[float(v)]]))
-    assert window.coinc_ydata_streams[0] == [3.0, 4.0, 5.0, 6.0, 7.0]
-    assert len(window.coinc_xdata_streams[0]) == 5
-
-    # Shrinking the limit while running trims the existing history.
-    window.coinc_points_input.setText("2")
-    window.on_coinc_points_changed()
-    assert window.coinc_ydata_streams[0] == [6.0, 7.0]
-
-    # Invalid input is rejected and the previous value restored.
-    window.coinc_points_input.setText("abc")
-    window.on_coinc_points_changed()
-    assert window.coinc_points_input.text() == "2"
+    window.coinc_nvalues_input.returnPressed.emit()
+    assert window.coinc_worker is None
+    fake_workers.coincidences.assert_not_called()
