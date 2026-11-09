@@ -265,14 +265,65 @@ def test_start_histogram_passes_auth_token_and_server(qtbot, fake_workers, suffi
     assert kwargs["server_ip"] == window.server_ip
 
 
-@pytest.mark.parametrize("mode", ["Free Running", "Single"])
-def test_counter_plot_shows_latest_frame_not_sum(qtbot, mode):
-    """Each Counter frame is a full rolling-buffer snapshot, so the plot must
-    show the latest frame rather than summing frames (which made a ramp)."""
+def _free_running_window(qtbot, n_bins, n_channels=1):
     import numpy as np
     window = MainWindow()
     qtbot.addWidget(window)
-    window.mode_combo.setCurrentText(mode)
+    window.mode_combo.setCurrentText("Free Running")
+    window.data_buffers = [np.zeros(n_bins) for _ in range(n_channels)]
+    window.plot_curves = [window.plot_widget.plot() for _ in range(n_channels)]
+    window.fr_sums = None
+    window.fr_binwidth_s = 1e6  # huge bins: fill tracked by padding only
+    return window
+
+
+def test_free_running_plot_averages_frames(qtbot):
+    """Free Running shows the per-bin mean over all frames received."""
+    import numpy as np
+    window = _free_running_window(qtbot, 4)
+
+    window.update_plot(np.array([[5, 1, 0, 2]]))
+    window.update_plot(np.array([[5, 1, 0, 2]]))
+    window.update_plot(np.array([[2, 1, 3, 2]]))
+
+    assert list(window.data_buffers[0]) == [4, 1, 1, 2]
+    assert list(window.plot_curves[0].yData) == [4, 1, 1, 2]
+
+
+def test_free_running_plot_not_biased_by_fill_padding(qtbot):
+    """While the rolling buffer fills, left bins are zero padding. They must
+    not be averaged in, or the plot ramps up towards the right."""
+    import numpy as np
+    window = _free_running_window(qtbot, 4, n_channels=2)
+
+    # Constant true rate of 3 counts/bin; buffer fills from the right.
+    window.update_plot(np.array([[0, 0, 0, 3], [0, 0, 0, 0]]))
+    window.update_plot(np.array([[0, 0, 3, 3], [0, 0, 0, 0]]))
+    window.update_plot(np.array([[0, 3, 3, 3], [0, 0, 0, 0]]))
+    window.update_plot(np.array([[3, 3, 3, 3], [0, 0, 0, 0]]))
+    window.update_plot(np.array([[3, 3, 3, 3], [0, 0, 0, 0]]))
+
+    assert list(window.data_buffers[0]) == [3, 3, 3, 3]
+    assert list(window.data_buffers[1]) == [0, 0, 0, 0]
+
+
+def test_free_running_y_axis_label(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.mode_combo.setCurrentText("Single")
+    window.mode_combo.setCurrentText("Free Running")
+    label = window.plot_widget.getAxis('left').labelText
+    assert "Mean counts / bin" in label
+    window.mode_combo.setCurrentText("Single")
+    assert window.plot_widget.getAxis('left').labelText == "Counts / bin"
+
+
+def test_single_plot_shows_latest_frame_not_sum(qtbot):
+    """Single shows the latest Counter snapshot rather than summing frames."""
+    import numpy as np
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.mode_combo.setCurrentText("Single")
     window.data_buffers = [np.zeros(4)]
     window.plot_curves = [window.plot_widget.plot()]
 
