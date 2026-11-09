@@ -2558,7 +2558,12 @@ class MainWindow(QMainWindow):
         for i in range(len(self.plot_curves)):
             if i < rates_2d.shape[0]:
                 if mode == "Free Running" or mode == "Single":
-                    self.data_buffers[i] += rates_2d[i]
+                    # Each frame is a full snapshot of the Time Tagger Counter's
+                    # rolling buffer (Counter.getData(rolling=True)): the actual
+                    # counts per bin, newest bin last. Show the latest snapshot;
+                    # summing frames would count each bin many times and produce
+                    # a ramp, because unfilled bins are zero-padded on the left.
+                    self.data_buffers[i] = np.asarray(rates_2d[i], dtype=float).copy()
                 elif mode == "Repeating":
                     # Append new value, pop oldest if we exceed history
                     val = rates_2d[i][0] if len(rates_2d[i]) > 0 else 0

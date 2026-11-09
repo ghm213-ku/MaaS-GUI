@@ -263,3 +263,22 @@ def test_start_histogram_passes_auth_token_and_server(qtbot, fake_workers, suffi
     kwargs = worker_cls.call_args.kwargs
     assert kwargs["auth_token"] == "test-token"
     assert kwargs["server_ip"] == window.server_ip
+
+
+@pytest.mark.parametrize("mode", ["Free Running", "Single"])
+def test_counter_plot_shows_latest_frame_not_sum(qtbot, mode):
+    """Each Counter frame is a full rolling-buffer snapshot, so the plot must
+    show the latest frame rather than summing frames (which made a ramp)."""
+    import numpy as np
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.mode_combo.setCurrentText(mode)
+    window.data_buffers = [np.zeros(4)]
+    window.plot_curves = [window.plot_widget.plot()]
+
+    # Buffer still filling: unfilled bins are zero-padded on the left.
+    window.update_plot(np.array([[0, 0, 1, 1]]))
+    window.update_plot(np.array([[1, 1, 1, 1]]))
+
+    assert list(window.data_buffers[0]) == [1, 1, 1, 1]
+    assert list(window.plot_curves[0].yData) == [1, 1, 1, 1]
