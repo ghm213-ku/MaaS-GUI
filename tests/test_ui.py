@@ -155,8 +155,12 @@ def test_login_fetches_channel_bookings(qtbot, mocker):
     window.login_password_input.setText("secret")
     window.authenticate()
 
-    mock_get.assert_called_once_with(f"{window.api_url}/channels", timeout=2)
-    assert seen_auth == ["Bearer login-token"]
+    # Bookings (with trailing slash, so MaaS doesn't redirect), then trigger/delay values
+    assert [c.args[0] for c in mock_get.call_args_list] == [
+        f"{window.api_url}/channels/",
+        f"{window.api_url}/channels/parameters",
+    ]
+    assert seen_auth == ["Bearer login-token", "Bearer login-token"]
     assert window.channel_nodes[2].node.booked_by == "alice"
     assert window.channel_nodes[2].node.is_current_user
     assert window.channel_nodes[5].node.booked_by == "bob"

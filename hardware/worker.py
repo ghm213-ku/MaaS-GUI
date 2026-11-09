@@ -47,7 +47,7 @@ def check_channels_booked(session, base_url, channels, user_name):
     an error message for the user, or None if all channels are booked by them.
     Raises requests.exceptions.RequestException if MaaS cannot be queried.
     """
-    resp = session.get(f"{base_url}/channels", timeout=2)
+    resp = session.get(f"{base_url}/channels/", timeout=2)
     resp.raise_for_status()
     channels_info = {c.get("channel_number"): c for c in resp.json().get("channels", [])}
 
@@ -69,6 +69,21 @@ def check_channels_booked(session, base_url, channels, user_name):
         return (" ".join(problems) +
                 f" Book the channels as '{user_name}' on the home page before starting a measurement.")
     return None
+
+
+def ws_auth_header(auth_token):
+    """WebSocket handshake headers carrying the MaaS login token, as for REST calls."""
+    return [f"Authorization: Bearer {auth_token}"] if auth_token else []
+
+
+def single_duration_seconds(binwidth, n_values):
+    """Acquisition time of a Single run: exactly n_values bins of binwidth ps."""
+    return (int(n_values) * int(binwidth)) / 1e12
+
+
+# A Single run is stopped by MaaS (Time Tagger startFor), which then sends a last
+# frame flagged "final". This grace period only guards against never receiving it.
+SINGLE_FINAL_FRAME_GRACE_S = 10.0
 
 
 class CountRateWorker(QThread):
@@ -128,7 +143,7 @@ class CountRateWorker(QThread):
                 payload_n_values = 1 # Force exactly 1 bin
                 payload_refresh = int(max(1, min(100, 1e12 / self.binwidth))) # Derive Hz from binwidth, bound between 1-100Hz
             elif self.mode == "Single":
-                self.exact_duration_sec = (self.n_values * self.binwidth) / 1e12
+                self.exact_duration_sec = single_duration_seconds(self.binwidth, self.n_values)
                 payload_binwidth = int(self.binwidth)
                 payload_n_values = int(self.n_values)
                 payload_refresh = self.refresh_rate # Use standard refresh rate
@@ -139,6 +154,7 @@ class CountRateWorker(QThread):
 
             payload = {
                 "measurement_type": "count_rate_live",
+                **({"duration_seconds": self.exact_duration_sec} if self.mode == "Single" else {}),
                 "metadata": {
                     "channels": self.channels,
                     "user_name": self.user_name,
@@ -162,7 +178,7 @@ class CountRateWorker(QThread):
             logger.info(f"Connecting to WebSocket: {ws_url}")
             self.ws = websocket.WebSocket()
             # Give the backend up to 10 seconds to accept the connection (hardware init can be slow)
-            self.ws.connect(ws_url, timeout=10.0)
+            self.ws.connect(ws_url, timeout=10.0, header=ws_auth_header(self.auth_token))
             # Reduce timeout for the recv loop so it checks self.running frequently
             self.ws.settimeout(2.0)
             logger.info("WebSocket connected successfully!")
@@ -171,12 +187,19 @@ class CountRateWorker(QThread):
             start_time = None
             
             while self.running:
+                if (self.mode == "Single" and start_time is not None
+                        and time.time() - start_time > self.exact_duration_sec + SINGLE_FINAL_FRAME_GRACE_S):
+                    logger.warning("Single acquisition: no final frame from MaaS. Stopping worker.")
+                    self.running = False
+                    break
                 try:
                     msg = self.ws.recv()
                     if msg and not self.is_paused:
                         try:
                             # Depending on if backend forwards raw redis string or re-serializes
                             msg_data = json.loads(msg)
+                            # Last frame of a timed (Single) acquisition: the counter has finished
+                            is_final = isinstance(msg_data, dict) and bool(msg_data.get("final"))
                             # Handle both raw list and {"data": list} dictionary payload
                             if isinstance(msg_data, dict) and "data" in msg_data:
                                 rates_raw = msg_data.get("data", [])
@@ -200,9 +223,10 @@ class CountRateWorker(QThread):
                                 # Emit the raw counts per bin directly (num_channels, n_values)
                                 self.newDataReady.emit(rates_arr)
                                 
-                                # If Single mode, stop after exact duration has elapsed
-                                if self.mode == "Single" and (time.time() - start_time) >= self.exact_duration_sec:
-                                    logger.info(f"Single measurement duration ({self.exact_duration_sec}s) complete. Stopping worker.")
+                                # Single mode: MaaS runs the counter for exactly n_values bins and
+                                # flags the complete buffer as the final frame.
+                                if self.mode == "Single" and is_final:
+                                    logger.info(f"Single acquisition ({self.exact_duration_sec}s) complete. Stopping worker.")
                                     self.running = False
                                     break
                         except Exception as e:

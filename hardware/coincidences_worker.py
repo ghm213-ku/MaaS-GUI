@@ -5,7 +5,10 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
-from hardware.worker import normalize_server_url, check_channels_booked, DEFAULT_SERVER_IP
+from hardware.worker import (
+    normalize_server_url, check_channels_booked, ws_auth_header, single_duration_seconds,
+    SINGLE_FINAL_FRAME_GRACE_S, DEFAULT_SERVER_IP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,7 @@ class CoincidencesWorker(QThread):
                 payload_n_values = 1 # Force exactly 1 bin
                 payload_refresh = int(max(1, min(100, 1e12 / self.binwidth))) # Derive Hz from binwidth, bound between 1-100Hz
             elif self.mode == "Single":
-                self.exact_duration_sec = (self.n_values * self.binwidth) / 1e12
+                self.exact_duration_sec = single_duration_seconds(self.binwidth, self.n_values)
                 payload_binwidth = int(self.binwidth)
                 payload_n_values = int(self.n_values)
                 payload_refresh = self.refresh_rate # Use standard refresh rate
@@ -114,6 +117,7 @@ class CoincidencesWorker(QThread):
 
             payload = {
                 "measurement_type": "coincidences_live",
+                **({"duration_seconds": self.exact_duration_sec} if self.mode == "Single" else {}),
                 "metadata": {
                     "coincidences": self.coincidences,
                     "coincidence_window": self.coincidence_window,
@@ -142,7 +146,7 @@ class CoincidencesWorker(QThread):
             logger.info(f"Connecting to WebSocket: {ws_url}")
             self.ws = websocket.WebSocket()
             # Give the backend up to 10 seconds to accept the connection (hardware init can be slow)
-            self.ws.connect(ws_url, timeout=10.0)
+            self.ws.connect(ws_url, timeout=10.0, header=ws_auth_header(self.auth_token))
             # Reduce timeout for the recv loop so it checks self.running frequently
             self.ws.settimeout(2.0)
             logger.info("WebSocket connected successfully!")
@@ -151,17 +155,26 @@ class CoincidencesWorker(QThread):
             start_time = None
             
             while self.running:
+                if (self.mode == "Single" and start_time is not None
+                        and time.time() - start_time > self.exact_duration_sec + SINGLE_FINAL_FRAME_GRACE_S):
+                    logger.warning("Single acquisition: no final frame from MaaS. Stopping worker.")
+                    self.running = False
+                    break
                 try:
                     msg = self.ws.recv()
                     if msg and not self.is_paused:
                         try:
                             msg_data = json.loads(msg)
+                            # Last frame of a timed (Single) acquisition: the counter has finished
+                            is_final = isinstance(msg_data, dict) and bool(msg_data.get("final"))
                             num_coinc = len(self.coincidences) if self.coincidences else (len(self.channels) if self.channels else 1)
 
                             # Handle dedicated per-stream message: {"type": "coincidences_live_stream", "stream_index": i, "rate": ..., "data": ...}
                             if isinstance(msg_data, dict) and msg_data.get("type") == "coincidences_live_stream":
                                 s_idx = int(msg_data.get("stream_index", 0))
-                                s_val = msg_data.get("rate", msg_data.get("data", 0.0))
+                                # "data" is the stream's full Counter buffer (n_values bins);
+                                # "rate" (counts/s of the latest bin) is only a fallback.
+                                s_val = msg_data.get("data", msg_data.get("rate", 0.0))
                                 s_arr = np.array([s_val], dtype=float).flatten()
                                 self.streamDataReady.emit(s_idx, s_arr)
                                 
@@ -169,13 +182,20 @@ class CoincidencesWorker(QThread):
                                 if s_idx < num_coinc:
                                     full_arr[s_idx] = s_arr
                                 self.newDataReady.emit(full_arr)
+                                if start_time is None:
+                                    start_time = time.time()
+                                if self.mode == "Single" and is_final:
+                                    logger.info(f"Single acquisition ({self.exact_duration_sec}s) complete. Stopping worker.")
+                                    self.running = False
+                                    break
                                 continue
 
                             # Multiplexed payload: {"type": "coincidences_live", "streams": [...], "data": [...]}
                             if isinstance(msg_data, dict):
                                 if "streams" in msg_data and isinstance(msg_data["streams"], list) and len(msg_data["streams"]) > 0:
                                     self.latest_streams = msg_data["streams"]
-                                    rates_raw = [s.get("rate", s.get("data", 0.0)) for s in self.latest_streams]
+                                    # Each stream's "data" is its Counter buffer: counts per bin, oldest first.
+                                    rates_raw = [s.get("data", s.get("rate", 0.0)) for s in self.latest_streams]
                                 elif "data" in msg_data:
                                     rates_raw = msg_data.get("data", [])
                                 else:
@@ -210,9 +230,10 @@ class CoincidencesWorker(QThread):
                                 for i in range(rates_arr.shape[0]):
                                     self.streamDataReady.emit(i, rates_arr[i])
                                 
-                                # If Single mode, stop after exact duration has elapsed
-                                if self.mode == "Single" and (time.time() - start_time) >= self.exact_duration_sec:
-                                    logger.info(f"Single measurement duration ({self.exact_duration_sec}s) complete. Stopping worker.")
+                                # Single mode: MaaS runs the counter for exactly n_values bins and
+                                # flags the complete buffer as the final frame.
+                                if self.mode == "Single" and is_final:
+                                    logger.info(f"Single acquisition ({self.exact_duration_sec}s) complete. Stopping worker.")
                                     self.running = False
                                     break
                         except Exception as e:
@@ -247,6 +268,11 @@ class CoincidencesWorker(QThread):
         num_items = len(self.coincidences) if getattr(self, 'coincidences', None) else (len(self.channels) if getattr(self, 'channels', None) else 1)
         if num_items == 0:
             num_items = 1
+
+        if self.mode not in ("Repeating", "Single"):
+            self._run_mock_rolling(num_items, refresh_interval)
+            return
+
         while self.running:
             if not self.is_paused:
                 if self.mode == "Repeating":
@@ -272,6 +298,30 @@ class CoincidencesWorker(QThread):
                     self.running = False
                     break
                     
+            time.sleep(refresh_interval)
+
+    def _run_mock_rolling(self, num_items, refresh_interval):
+        """Mimic the backend's live Counter: a rolling buffer of n_values bins
+        of binwidth ps (oldest first) that gains one bin per elapsed binwidth."""
+        import time
+        n_values = max(1, int(self.n_values))
+        binwidth_s = max(self.binwidth, 1) * 1e-12
+        rates = [500.0 + i * 350.0 for i in range(num_items)]  # coincidences / s
+        buffer = np.zeros((num_items, n_values))
+        start_time = time.time()
+        bins_done = 0
+        while self.running:
+            bins_now = int((time.time() - start_time) / binwidth_s)
+            new_bins = min(bins_now - bins_done, n_values)
+            bins_done = bins_now
+            if new_bins > 0:
+                buffer = np.roll(buffer, -new_bins, axis=1)
+                for i in range(num_items):
+                    buffer[i, -new_bins:] = np.random.poisson(rates[i] * binwidth_s, size=new_bins)
+            if not self.is_paused:
+                self.newDataReady.emit(buffer.copy())
+                for i in range(num_items):
+                    self.streamDataReady.emit(i, buffer[i].copy())
             time.sleep(refresh_interval)
 
     def _perform_teardown(self):

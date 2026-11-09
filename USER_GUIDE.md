@@ -60,6 +60,11 @@ The Coincidences tab measures simultaneous events (coincidences) across channels
 - By default, 1 box is open. Use the **`+`** icon to add additional coincidence group boxes for concurrent multi-group measurements, and **`-`** to remove them.
 - **Validation**: When starting a measurement, the application validates that input formats are correct and that all entered channels correspond to channels chosen in the initial Channels Setup tab.
 - **Individual Data Streams & Plotting**: Each coincidence channel group has an individual data stream with its own color-coded plot curve and legend entry, visualizing simultaneous events across all specified groups concurrently.
+- **Bin width (ps)**: The time step: how long each bin counts coincidences (default `1e9` ps = 1 ms; `1e12` = 1 s).
+- **Bins**: How many bins the rolling window holds (default 1000). The plot spans *Bins × Bin width*, e.g. 1000 × 1 ms = 1 s.
+- Press **Enter** in either box while a measurement is running to restart it with the new values.
+- **What is plotted**: The number of coincidences in each bin (the Time Tagger `Counter` on the coincidence channels). The x-axis is time in seconds, with 0 at the newest bin and older bins to the left. The plot refreshes 25 times per second.
+- **Zoom & legend**: Use the **⌕** button to drag a box to zoom, **⤢** to return to auto range, and the legend checkboxes to show or hide individual groups.
 
 ---
 

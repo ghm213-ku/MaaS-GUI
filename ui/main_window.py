@@ -4,6 +4,7 @@ import json
 import base64
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ from PyQt6.QtWidgets import (
     QMenu,QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QMessageBox,
                              QTabWidget, QGridLayout, QScrollArea, QCheckBox,
-                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox, QStackedWidget)
+                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox, QStackedWidget,
+                             QApplication)
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThreadPool
 
@@ -133,11 +135,15 @@ class ChannelNodeWidget(QFrame):
         """Apply new trigger/delay values, sending them to MaaS first when connected."""
         if self.apply_parameters is not None and not self.apply_parameters(self.channel_id, trigger, delay):
             return False
+        self.show_parameters(trigger, delay)
+        return True
+
+    def show_parameters(self, trigger, delay):
+        """Display trigger/delay values without sending them to MaaS (e.g. values read back from MaaS)."""
         self.trigger_val = trigger
         self.delay_val = delay
         self.lbl_trig.setText(f"{trigger}V")
         self.lbl_dly.setText(f"{delay}ps")
-        return True
             
     def set_booked_by(self, user_name, is_current_user):
         self.booked_by = user_name
@@ -294,6 +300,13 @@ class SITimeAxisItem(pg.AxisItem):
 
 
 class MainWindow(QMainWindow):
+    # Live coincidences: the backend feeds the coincidence virtual channels into
+    # a TimeTagger.Counter(binwidth, n_values) and publishes its whole rolling
+    # buffer at the refresh rate.
+    COINC_DEFAULT_BINWIDTH = "1e9"   # ps (1 ms)
+    COINC_DEFAULT_N_VALUES = "1000"
+    COINC_REFRESH_HZ = 25
+
     def __init__(self, force_mock=False, server_ip=None):
         super().__init__()
         self.force_mock = force_mock
@@ -714,9 +727,20 @@ class MainWindow(QMainWindow):
             resp = self.session.post(f"{self.server_url}/auth/users", json=payload, headers=headers, timeout=5)
 
             if resp.status_code == 201:
-                QMessageBox.information(self, "Success", f"User '{username}' with role '{role_name}' created successfully.")
+                # MaaS sets a new account's password to its username; tell the admin
+                # so they can pass it on.
+                try:
+                    note = resp.json().get("initial_password_note")
+                except (ValueError, AttributeError):
+                    note = None
+                if not isinstance(note, str) or not note:
+                    note = (f"The initial password is the username ('{username}'). "
+                            "Ask the user to change it after their first login.")
+                QMessageBox.information(self, "Success",
+                                        f"User '{username}' with role '{role_name}' created successfully.\n\n{note}")
                 self.new_user_username_input.clear()
-                self.add_user_status_label.setText(f"User '{username}' ({role_name}) created successfully.")
+                self.add_user_status_label.setText(
+                    f"User '{username}' ({role_name}) created successfully. Initial password: the username.")
                 self.add_user_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
             elif resp.status_code == 400:
                 detail = resp.json().get("detail", "Username already exists or invalid role")
@@ -1385,7 +1409,7 @@ class MainWindow(QMainWindow):
         if getattr(self, 'force_mock', False):
             return
         try:
-            resp = self.session.get(f"{self.api_url}/channels", timeout=2)
+            resp = self.session.get(f"{self.api_url}/channels/", timeout=2)
             if resp.status_code == 200:
                 # Clear all first
                 for container in self.channel_nodes.values():
@@ -1403,8 +1427,79 @@ class MainWindow(QMainWindow):
                         self.channel_nodes[ch_num].set_booked_by(user_name, is_current)
             else:
                 logger.error(f"Failed to fetch booked channels: {resp.status_code} {resp.text}")
+                return
         except Exception as e:
             logger.error(f"Failed to fetch booked channels: {e}")
+            return
+        self.fetch_channel_parameters()
+
+    def fetch_channel_parameters(self):
+        """Show each channel's trigger/delay as MaaS reads them from the Time Tagger.
+
+        MaaS can change them without the GUI (startup defaults, the reset queued
+        when channels are released), so the labels are refreshed from
+        GET /api/v1/channels/parameters instead of trusting local values.
+        """
+        if getattr(self, 'force_mock', False):
+            return
+        try:
+            resp = self.session.get(f"{self.api_url}/channels/parameters", timeout=2)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch channel parameters: {e}")
+            return
+        if resp.status_code != 200:
+            logger.warning(f"Could not read channel parameters from MaaS: {resp.status_code}")
+            return
+        try:
+            entries = resp.json().get("channels", [])
+        except (ValueError, AttributeError):
+            return
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            ch = entry.get("channel_number")
+            if ch not in self.channel_nodes or "trigger_voltage" not in entry or "input_delay" not in entry:
+                continue
+            try:
+                trigger = round(float(entry["trigger_voltage"]), 4)
+                delay = int(entry["input_delay"])
+            except (TypeError, ValueError):
+                continue
+            self.channel_nodes[ch].node.show_parameters(trigger, delay)
+
+    # How long to wait for MaaS's worker to apply a queued set-parameters job.
+    PARAMETER_JOB_TIMEOUT_S = 10.0
+
+    def wait_for_job(self, measurement_id, timeout=None):
+        """Poll GET /measurements/{id}/status until the job finishes.
+
+        POST /set-parameters/ only queues the job, so a 201 does not mean the
+        hardware accepted the values. Returns (status, message) where status is
+        "completed", "failed" or "stopped", or None if the job did not finish
+        within the timeout.
+        """
+        timeout = self.PARAMETER_JOB_TIMEOUT_S if timeout is None else timeout
+        deadline = time.monotonic() + timeout
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            while True:
+                try:
+                    resp = self.session.get(f"{self.api_url}/measurements/{measurement_id}/status", timeout=2)
+                    if resp.status_code == 200:
+                        body = resp.json()
+                        status = body.get("status")
+                        if status in ("completed", "failed", "stopped"):
+                            return status, body.get("message") or ""
+                    else:
+                        logger.warning(f"Status query for job {measurement_id} failed: {resp.status_code}")
+                except (requests.exceptions.RequestException, ValueError, AttributeError) as e:
+                    logger.warning(f"Status query for job {measurement_id} failed: {e}")
+                if time.monotonic() >= deadline:
+                    return None, ""
+                QApplication.processEvents()
+                time.sleep(0.2)
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def apply_channel_parameters(self, channel, trigger, delay):
         """Send a channel's trigger voltage and input delay to MaaS (POST /set-parameters/).
@@ -1441,8 +1536,30 @@ class MainWindow(QMainWindow):
             return False
 
         if resp.status_code in (200, 201):
-            logger.info(f"Set parameters for channel {channel}: trigger={trigger} V, delay={delay} ps")
-            return True
+            try:
+                job_id = resp.json().get("measurement_id")
+            except (ValueError, AttributeError):
+                job_id = None
+            if not isinstance(job_id, str) or not job_id:
+                logger.warning(f"MaaS accepted parameters for channel {channel} but returned no job ID")
+                return True
+            status, message = self.wait_for_job(job_id)
+            # Afterwards, show what the hardware reports (runs after the node stored the values)
+            QTimer.singleShot(0, self.fetch_channel_parameters)
+            if status == "completed":
+                logger.info(f"Set parameters for channel {channel}: trigger={trigger} V, delay={delay} ps")
+                return True
+            if status is None:
+                logger.warning(f"Set-parameters job {job_id} for channel {channel} not confirmed in time")
+                QMessageBox.warning(self, "Set Parameters Pending",
+                                    f"MaaS queued the trigger/delay for channel {channel} but has not "
+                                    "applied it yet. The displayed values update once it has.")
+                return False
+            logger.error(f"Set-parameters job {job_id} for channel {channel} {status}: {message}")
+            QMessageBox.warning(self, "Set Parameters Failed",
+                                f"The Time Tagger did not apply the trigger/delay for channel {channel} "
+                                f"(job {status}):\n{message}")
+            return False
 
         logger.error(f"MaaS rejected parameters for channel {channel}: {resp.status_code} {resp.text}")
         QMessageBox.warning(self, "Set Parameters Failed",
@@ -1512,6 +1629,16 @@ class MainWindow(QMainWindow):
             resp = self.session.post(f"{self.api_url}/channels/release/{user_name}", json=payload, timeout=2)
             if resp.status_code == 200:
                 logger.info(f"Released channels {selected_channels} for {user_name}")
+                # MaaS queues a reset of the released channels to 0.5 V / 0 ps; wait
+                # for it so the labels refreshed below show the reset values.
+                try:
+                    reset_id = resp.json().get("parameter_reset_id")
+                except (ValueError, AttributeError):
+                    reset_id = None
+                if isinstance(reset_id, str) and reset_id:
+                    status, message = self.wait_for_job(reset_id)
+                    if status != "completed":
+                        logger.error(f"Parameter reset after release not applied ({status}): {message}")
             else:
                 try:
                     detail = resp.json().get("detail", resp.text)
@@ -1671,17 +1798,47 @@ class MainWindow(QMainWindow):
         self.coinc_btn_stop.setEnabled(False)
         self.coinc_btn_stop.clicked.connect(self.stop_coincidences_measurement)
         
+        self.coinc_btn_zoom = QPushButton("⌕")
+        self.coinc_btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.coinc_btn_zoom.setCheckable(True)
+        self.coinc_btn_zoom.setToolTip("Toggle Zoom Mode (drag a box to zoom)")
+        self.coinc_btn_zoom.clicked.connect(self.coinc_toggle_zoom)
+
+        self.coinc_btn_auto_range = QPushButton("⤢")
+        self.coinc_btn_auto_range.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.coinc_btn_auto_range.setToolTip("Enable continuous Auto Range")
+        self.coinc_btn_auto_range.clicked.connect(self.coinc_force_auto_range)
+
         controls.addWidget(self.coinc_btn_play_pause)
         controls.addWidget(self.coinc_btn_stop)
         controls.addWidget(self.coinc_btn_reset)
-        
+        controls.addWidget(self.coinc_btn_zoom)
+        controls.addWidget(self.coinc_btn_auto_range)
+
         controls.addSpacing(20)
         controls.addWidget(QLabel("Coincidence Window (ps):"))
         self.coinc_binwidth_input = QLineEdit("1000")
         self.coinc_binwidth_input.setMaximumWidth(80)
         self.coinc_binwidth_input.setToolTip("Coincidence window in picoseconds (default: 1000 ps = 1 ns)")
         controls.addWidget(self.coinc_binwidth_input)
-        
+
+        # Counter binning for the coincidence virtual channels (sent to MaaS as
+        # binwidth / n_values). Press Enter to apply while running.
+        controls.addSpacing(10)
+        controls.addWidget(QLabel("Bin width (ps):"))
+        self.coinc_bin_input = QLineEdit(self.COINC_DEFAULT_BINWIDTH)
+        self.coinc_bin_input.setMaximumWidth(80)
+        self.coinc_bin_input.setToolTip("Time step: width of each counter bin in picoseconds (1e9 ps = 1 ms)")
+        self.coinc_bin_input.returnPressed.connect(self.quick_restart_coincidences)
+        controls.addWidget(self.coinc_bin_input)
+
+        controls.addWidget(QLabel("Bins:"))
+        self.coinc_nvalues_input = QLineEdit(self.COINC_DEFAULT_N_VALUES)
+        self.coinc_nvalues_input.setMaximumWidth(60)
+        self.coinc_nvalues_input.setToolTip("Number of bins in the rolling buffer (time span = bins x bin width)")
+        self.coinc_nvalues_input.returnPressed.connect(self.quick_restart_coincidences)
+        controls.addWidget(self.coinc_nvalues_input)
+
         controls.addSpacing(20)
         controls.addWidget(QLabel("Channels:"))
         self.coinc_channels_layout = QHBoxLayout()
@@ -1710,15 +1867,94 @@ class MainWindow(QMainWindow):
         
         self.coinc_plot_widget = pg.PlotWidget(axisItems={'bottom': SITimeAxisItem(orientation='bottom')})
         self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.coinc_plot_widget.setLabel('bottom', 'Time steps')
-        self.coinc_plot_widget.setLabel('left', 'Coincidence Counts')
-        self.coinc_legend = self.coinc_plot_widget.addLegend(offset=(10, 10))
+        self.coinc_plot_widget.setLabel('bottom', 'Time (s, 0 = latest bin)')
+        self.coinc_plot_widget.setLabel('left', 'Coincidences / bin')
+        self.coinc_binwidth_ps = int(float(self.COINC_DEFAULT_BINWIDTH))
+        self.coinc_xdata = np.array([])
+        self.coinc_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = []
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
-        layout.addWidget(self.coinc_plot_widget)
-        
+
+        # Plot with an overlaid checkbox legend (same as the Counter tab), so
+        # individual coincidence groups can be shown / hidden.
+        coinc_plot_container = QGridLayout()
+        coinc_plot_container.setContentsMargins(0, 0, 0, 0)
+        coinc_plot_container.addWidget(self.coinc_plot_widget, 0, 0)
+
+        self.coinc_legend_layout = QVBoxLayout()
+        self.coinc_legend_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.coinc_legend_layout.setContentsMargins(10, 10, 10, 10)
+
+        coinc_legend_widget = QWidget()
+        coinc_legend_widget.setObjectName("LegendWidget")
+        coinc_legend_widget.setLayout(self.coinc_legend_layout)
+
+        self.coinc_legend_scroll = QScrollArea()
+        self.coinc_legend_scroll.setWidget(coinc_legend_widget)
+        self.coinc_legend_scroll.setWidgetResizable(True)
+        self.coinc_legend_scroll.setFixedSize(180, 250)
+        self.coinc_legend_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; } QWidget#LegendWidget { background-color: rgba(255, 255, 255, 220); border: 1px solid #ccc; border-radius: 6px; }")
+        self.coinc_legend_scroll.hide()
+        coinc_plot_container.addWidget(self.coinc_legend_scroll, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+
+        layout.addLayout(coinc_plot_container)
+
         self.coinc_worker = None
+
+    def quick_restart_coincidences(self):
+        """Apply new binning to a running measurement (binning is fixed once
+        the backend Counter is created, so this means a restart)."""
+        if self.coinc_worker is None:
+            return
+        if self._parse_coinc_binning() is None:
+            self._warn_invalid_coinc_binning()
+            return
+        self._retire_worker(self.coinc_worker)
+        self.coinc_worker = None
+        self.start_coincidences_measurement()
+
+    def _parse_coinc_binning(self):
+        """Return (binwidth_ps, n_values) from the inputs, or None if invalid."""
+        try:
+            binwidth = float(self.coinc_bin_input.text().strip())
+            n_values = int(self.coinc_nvalues_input.text().strip())
+        except ValueError:
+            return None
+        if not np.isfinite(binwidth) or binwidth < 1 or binwidth != int(binwidth) or n_values < 1:
+            return None
+        return int(binwidth), n_values
+
+    def _warn_invalid_coinc_binning(self):
+        QMessageBox.warning(
+            self,
+            "Invalid Input",
+            "Bin width must be a positive whole number of picoseconds (e.g. 1e9 = 1 ms) "
+            "and Bins must be a positive integer."
+        )
+
+    def _set_coinc_buffer(self, i, row):
+        """Show stream i's latest Counter buffer (oldest bin first), with x in
+        seconds relative to the newest bin."""
+        row = np.asarray(row, dtype=float).ravel()
+        if len(self.coinc_xdata) != len(row):
+            self.coinc_xdata = (np.arange(len(row)) - (len(row) - 1)) * (self.coinc_binwidth_ps * 1e-12)
+        self.coinc_ydata_streams[i] = row
+        self.coinc_plot_curves[i].setData(self.coinc_xdata, row)
+
+    def coinc_toggle_zoom(self, checked):
+        mode = pg.ViewBox.RectMode if checked else pg.ViewBox.PanMode
+        self.coinc_plot_widget.getViewBox().setMouseMode(mode)
+
+    def coinc_force_auto_range(self):
+        self.coinc_plot_widget.enableAutoRange()
+
+    def _clear_coinc_legend(self):
+        for i in reversed(range(self.coinc_legend_layout.count())):
+            widget = self.coinc_legend_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+        self.coinc_legend_scroll.hide()
 
     def add_coincidence_box(self):
         box = QLineEdit()
@@ -1849,16 +2085,22 @@ class MainWindow(QMainWindow):
 
             coincidences.append(group_channels)
 
+        binning = self._parse_coinc_binning()
+        if binning is None:
+            self._warn_invalid_coinc_binning()
+            return
+        binwidth_ps, n_values = binning
+
         self.coinc_plot_widget.clear()
-        if hasattr(self, 'coinc_legend') and self.coinc_legend is not None:
-            self.coinc_legend.clear()
-        else:
-            self.coinc_legend = self.coinc_plot_widget.addLegend(offset=(10, 10))
+        self._clear_coinc_legend()
+        self.coinc_plot_widget.enableAutoRange()
 
         palette = ['#00ff00', '#00e5ff', '#ffaa00', '#ff00aa', '#ffff00', '#aa00ff', '#ff5500', '#00aaff']
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = [[] for _ in coincidences]
         self.coinc_groups = coincidences
+        self.coinc_binwidth_ps = binwidth_ps
+        self.coinc_xdata = np.array([])
 
         for idx, group in enumerate(coincidences):
             color = palette[idx % len(palette)]
@@ -1867,6 +2109,15 @@ class MainWindow(QMainWindow):
             curve = self.coinc_plot_widget.plot(pen=pen, name=label)
             self.coinc_plot_curves.append(curve)
 
+            cb = QCheckBox(label)
+            cb.setChecked(True)
+            cb.setStyleSheet(f"color: {color}; font-weight: bold;")
+            cb.stateChanged.connect(lambda state, c=curve: c.setVisible(state == Qt.CheckState.Checked.value))
+            self.coinc_legend_layout.addWidget(cb)
+
+        if coincidences:
+            self.coinc_legend_scroll.show()
+
         self.coinc_plot_curve = self.coinc_plot_curves[0] if self.coinc_plot_curves else None
         self.coinc_ydata = []
 
@@ -1874,7 +2125,9 @@ class MainWindow(QMainWindow):
             coincidences=coincidences,
             user_name=self.login_username,
             coincidence_window=window_ps,
-            binwidth=int(1e9),
+            binwidth=binwidth_ps,
+            n_values=n_values,
+            refresh_rate=self.COINC_REFRESH_HZ,
             auth_token=self.auth_token,
             is_mock=self.force_mock,
             server_ip=self.server_ip)
@@ -1925,10 +2178,10 @@ class MainWindow(QMainWindow):
             
         self.coinc_ydata = []
         self.coinc_ydata_streams = []
+        self.coinc_xdata = np.array([])
         self.coinc_plot_curves = []
         self.coinc_plot_widget.clear()
-        if hasattr(self, 'coinc_legend') and self.coinc_legend is not None:
-            self.coinc_legend.clear()
+        self._clear_coinc_legend()
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
@@ -1952,38 +2205,29 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
             self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
 
+        # Each frame is (n_groups, n_values): the full Counter buffer per group.
         arr = np.array(data, dtype=float)
         if arr.ndim == 0:
             arr = arr.reshape(1, 1)
         elif arr.ndim == 1:
-            if arr.shape[0] == len(self.coinc_plot_curves):
+            if len(self.coinc_plot_curves) > 1 and arr.shape[0] == len(self.coinc_plot_curves):
                 arr = arr.reshape(-1, 1)
             else:
                 arr = arr.reshape(1, -1)
 
         for i in range(len(self.coinc_plot_curves)):
             if i < arr.shape[0]:
-                row = arr[i]
-                val = float(np.sum(row))
-                self.coinc_ydata_streams[i].append(val)
-                if len(self.coinc_ydata_streams[i]) > 100:
-                    self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-100:]
-                self.coinc_plot_curves[i].setData(self.coinc_ydata_streams[i])
+                self._set_coinc_buffer(i, arr[i])
 
         self.coinc_ydata = self.coinc_ydata_streams[0] if self.coinc_ydata_streams else []
 
     def update_coincidences_stream_plot(self, stream_index, stream_data):
-        import numpy as np
         if not hasattr(self, 'coinc_plot_curves') or stream_index >= len(self.coinc_plot_curves):
             return
         if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
             self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
 
-        val = float(np.sum(stream_data))
-        self.coinc_ydata_streams[stream_index].append(val)
-        if len(self.coinc_ydata_streams[stream_index]) > 100:
-            self.coinc_ydata_streams[stream_index] = self.coinc_ydata_streams[stream_index][-100:]
-        self.coinc_plot_curves[stream_index].setData(self.coinc_ydata_streams[stream_index])
+        self._set_coinc_buffer(stream_index, stream_data)
         if stream_index == 0:
             self.coinc_ydata = self.coinc_ydata_streams[0]
 
