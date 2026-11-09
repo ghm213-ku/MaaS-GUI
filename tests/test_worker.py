@@ -38,7 +38,7 @@ def test_worker_with_booked_channels_does_not_book(mocker, mock_channels_get):
     worker = CountRateWorker([1, 2], "testuser", int(1e9), 1000, 25)
 
     assert worker.booking_error is None
-    mock_channels_get.assert_called_once_with(f"{worker.base_url}/channels", timeout=2)
+    mock_channels_get.assert_called_once_with(f"{worker.base_url}/channels/", timeout=2)
     mock_post.assert_not_called()  # booking only happens via the home page Book button
 
 

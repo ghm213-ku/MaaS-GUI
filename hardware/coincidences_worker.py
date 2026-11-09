@@ -5,7 +5,10 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
-from hardware.worker import normalize_server_url, check_channels_booked, DEFAULT_SERVER_IP
+from hardware.worker import (
+    normalize_server_url, check_channels_booked, ws_auth_header, single_duration_seconds,
+    SINGLE_FINAL_FRAME_GRACE_S, DEFAULT_SERVER_IP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,7 @@ class CoincidencesWorker(QThread):
                 payload_n_values = 1 # Force exactly 1 bin
                 payload_refresh = int(max(1, min(100, 1e12 / self.binwidth))) # Derive Hz from binwidth, bound between 1-100Hz
             elif self.mode == "Single":
-                self.exact_duration_sec = (self.n_values * self.binwidth) / 1e12
+                self.exact_duration_sec = single_duration_seconds(self.binwidth, self.n_values)
                 payload_binwidth = int(self.binwidth)
                 payload_n_values = int(self.n_values)
                 payload_refresh = self.refresh_rate # Use standard refresh rate
@@ -114,6 +117,7 @@ class CoincidencesWorker(QThread):
 
             payload = {
                 "measurement_type": "coincidences_live",
+                **({"duration_seconds": self.exact_duration_sec} if self.mode == "Single" else {}),
                 "metadata": {
                     "coincidences": self.coincidences,
                     "coincidence_window": self.coincidence_window,
@@ -142,7 +146,7 @@ class CoincidencesWorker(QThread):
             logger.info(f"Connecting to WebSocket: {ws_url}")
             self.ws = websocket.WebSocket()
             # Give the backend up to 10 seconds to accept the connection (hardware init can be slow)
-            self.ws.connect(ws_url, timeout=10.0)
+            self.ws.connect(ws_url, timeout=10.0, header=ws_auth_header(self.auth_token))
             # Reduce timeout for the recv loop so it checks self.running frequently
             self.ws.settimeout(2.0)
             logger.info("WebSocket connected successfully!")
@@ -151,11 +155,18 @@ class CoincidencesWorker(QThread):
             start_time = None
             
             while self.running:
+                if (self.mode == "Single" and start_time is not None
+                        and time.time() - start_time > self.exact_duration_sec + SINGLE_FINAL_FRAME_GRACE_S):
+                    logger.warning("Single acquisition: no final frame from MaaS. Stopping worker.")
+                    self.running = False
+                    break
                 try:
                     msg = self.ws.recv()
                     if msg and not self.is_paused:
                         try:
                             msg_data = json.loads(msg)
+                            # Last frame of a timed (Single) acquisition: the counter has finished
+                            is_final = isinstance(msg_data, dict) and bool(msg_data.get("final"))
                             num_coinc = len(self.coincidences) if self.coincidences else (len(self.channels) if self.channels else 1)
 
                             # Handle dedicated per-stream message: {"type": "coincidences_live_stream", "stream_index": i, "rate": ..., "data": ...}
@@ -171,6 +182,12 @@ class CoincidencesWorker(QThread):
                                 if s_idx < num_coinc:
                                     full_arr[s_idx] = s_arr
                                 self.newDataReady.emit(full_arr)
+                                if start_time is None:
+                                    start_time = time.time()
+                                if self.mode == "Single" and is_final:
+                                    logger.info(f"Single acquisition ({self.exact_duration_sec}s) complete. Stopping worker.")
+                                    self.running = False
+                                    break
                                 continue
 
                             # Multiplexed payload: {"type": "coincidences_live", "streams": [...], "data": [...]}
@@ -213,9 +230,10 @@ class CoincidencesWorker(QThread):
                                 for i in range(rates_arr.shape[0]):
                                     self.streamDataReady.emit(i, rates_arr[i])
                                 
-                                # If Single mode, stop after exact duration has elapsed
-                                if self.mode == "Single" and (time.time() - start_time) >= self.exact_duration_sec:
-                                    logger.info(f"Single measurement duration ({self.exact_duration_sec}s) complete. Stopping worker.")
+                                # Single mode: MaaS runs the counter for exactly n_values bins and
+                                # flags the complete buffer as the final frame.
+                                if self.mode == "Single" and is_final:
+                                    logger.info(f"Single acquisition ({self.exact_duration_sec}s) complete. Stopping worker.")
                                     self.running = False
                                     break
                         except Exception as e:

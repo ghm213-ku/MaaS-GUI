@@ -4,6 +4,7 @@ import json
 import base64
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ from PyQt6.QtWidgets import (
     QMenu,QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QMessageBox,
                              QTabWidget, QGridLayout, QScrollArea, QCheckBox,
-                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox, QStackedWidget)
+                             QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox, QStackedWidget,
+                             QApplication)
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThreadPool
 
@@ -133,11 +135,15 @@ class ChannelNodeWidget(QFrame):
         """Apply new trigger/delay values, sending them to MaaS first when connected."""
         if self.apply_parameters is not None and not self.apply_parameters(self.channel_id, trigger, delay):
             return False
+        self.show_parameters(trigger, delay)
+        return True
+
+    def show_parameters(self, trigger, delay):
+        """Display trigger/delay values without sending them to MaaS (e.g. values read back from MaaS)."""
         self.trigger_val = trigger
         self.delay_val = delay
         self.lbl_trig.setText(f"{trigger}V")
         self.lbl_dly.setText(f"{delay}ps")
-        return True
             
     def set_booked_by(self, user_name, is_current_user):
         self.booked_by = user_name
@@ -721,9 +727,20 @@ class MainWindow(QMainWindow):
             resp = self.session.post(f"{self.server_url}/auth/users", json=payload, headers=headers, timeout=5)
 
             if resp.status_code == 201:
-                QMessageBox.information(self, "Success", f"User '{username}' with role '{role_name}' created successfully.")
+                # MaaS sets a new account's password to its username; tell the admin
+                # so they can pass it on.
+                try:
+                    note = resp.json().get("initial_password_note")
+                except (ValueError, AttributeError):
+                    note = None
+                if not isinstance(note, str) or not note:
+                    note = (f"The initial password is the username ('{username}'). "
+                            "Ask the user to change it after their first login.")
+                QMessageBox.information(self, "Success",
+                                        f"User '{username}' with role '{role_name}' created successfully.\n\n{note}")
                 self.new_user_username_input.clear()
-                self.add_user_status_label.setText(f"User '{username}' ({role_name}) created successfully.")
+                self.add_user_status_label.setText(
+                    f"User '{username}' ({role_name}) created successfully. Initial password: the username.")
                 self.add_user_status_label.setStyleSheet("color: #00aa00; font-size: 13px;")
             elif resp.status_code == 400:
                 detail = resp.json().get("detail", "Username already exists or invalid role")
@@ -1392,7 +1409,7 @@ class MainWindow(QMainWindow):
         if getattr(self, 'force_mock', False):
             return
         try:
-            resp = self.session.get(f"{self.api_url}/channels", timeout=2)
+            resp = self.session.get(f"{self.api_url}/channels/", timeout=2)
             if resp.status_code == 200:
                 # Clear all first
                 for container in self.channel_nodes.values():
@@ -1410,8 +1427,79 @@ class MainWindow(QMainWindow):
                         self.channel_nodes[ch_num].set_booked_by(user_name, is_current)
             else:
                 logger.error(f"Failed to fetch booked channels: {resp.status_code} {resp.text}")
+                return
         except Exception as e:
             logger.error(f"Failed to fetch booked channels: {e}")
+            return
+        self.fetch_channel_parameters()
+
+    def fetch_channel_parameters(self):
+        """Show each channel's trigger/delay as MaaS reads them from the Time Tagger.
+
+        MaaS can change them without the GUI (startup defaults, the reset queued
+        when channels are released), so the labels are refreshed from
+        GET /api/v1/channels/parameters instead of trusting local values.
+        """
+        if getattr(self, 'force_mock', False):
+            return
+        try:
+            resp = self.session.get(f"{self.api_url}/channels/parameters", timeout=2)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch channel parameters: {e}")
+            return
+        if resp.status_code != 200:
+            logger.warning(f"Could not read channel parameters from MaaS: {resp.status_code}")
+            return
+        try:
+            entries = resp.json().get("channels", [])
+        except (ValueError, AttributeError):
+            return
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            ch = entry.get("channel_number")
+            if ch not in self.channel_nodes or "trigger_voltage" not in entry or "input_delay" not in entry:
+                continue
+            try:
+                trigger = round(float(entry["trigger_voltage"]), 4)
+                delay = int(entry["input_delay"])
+            except (TypeError, ValueError):
+                continue
+            self.channel_nodes[ch].node.show_parameters(trigger, delay)
+
+    # How long to wait for MaaS's worker to apply a queued set-parameters job.
+    PARAMETER_JOB_TIMEOUT_S = 10.0
+
+    def wait_for_job(self, measurement_id, timeout=None):
+        """Poll GET /measurements/{id}/status until the job finishes.
+
+        POST /set-parameters/ only queues the job, so a 201 does not mean the
+        hardware accepted the values. Returns (status, message) where status is
+        "completed", "failed" or "stopped", or None if the job did not finish
+        within the timeout.
+        """
+        timeout = self.PARAMETER_JOB_TIMEOUT_S if timeout is None else timeout
+        deadline = time.monotonic() + timeout
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            while True:
+                try:
+                    resp = self.session.get(f"{self.api_url}/measurements/{measurement_id}/status", timeout=2)
+                    if resp.status_code == 200:
+                        body = resp.json()
+                        status = body.get("status")
+                        if status in ("completed", "failed", "stopped"):
+                            return status, body.get("message") or ""
+                    else:
+                        logger.warning(f"Status query for job {measurement_id} failed: {resp.status_code}")
+                except (requests.exceptions.RequestException, ValueError, AttributeError) as e:
+                    logger.warning(f"Status query for job {measurement_id} failed: {e}")
+                if time.monotonic() >= deadline:
+                    return None, ""
+                QApplication.processEvents()
+                time.sleep(0.2)
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def apply_channel_parameters(self, channel, trigger, delay):
         """Send a channel's trigger voltage and input delay to MaaS (POST /set-parameters/).
@@ -1448,8 +1536,30 @@ class MainWindow(QMainWindow):
             return False
 
         if resp.status_code in (200, 201):
-            logger.info(f"Set parameters for channel {channel}: trigger={trigger} V, delay={delay} ps")
-            return True
+            try:
+                job_id = resp.json().get("measurement_id")
+            except (ValueError, AttributeError):
+                job_id = None
+            if not isinstance(job_id, str) or not job_id:
+                logger.warning(f"MaaS accepted parameters for channel {channel} but returned no job ID")
+                return True
+            status, message = self.wait_for_job(job_id)
+            # Afterwards, show what the hardware reports (runs after the node stored the values)
+            QTimer.singleShot(0, self.fetch_channel_parameters)
+            if status == "completed":
+                logger.info(f"Set parameters for channel {channel}: trigger={trigger} V, delay={delay} ps")
+                return True
+            if status is None:
+                logger.warning(f"Set-parameters job {job_id} for channel {channel} not confirmed in time")
+                QMessageBox.warning(self, "Set Parameters Pending",
+                                    f"MaaS queued the trigger/delay for channel {channel} but has not "
+                                    "applied it yet. The displayed values update once it has.")
+                return False
+            logger.error(f"Set-parameters job {job_id} for channel {channel} {status}: {message}")
+            QMessageBox.warning(self, "Set Parameters Failed",
+                                f"The Time Tagger did not apply the trigger/delay for channel {channel} "
+                                f"(job {status}):\n{message}")
+            return False
 
         logger.error(f"MaaS rejected parameters for channel {channel}: {resp.status_code} {resp.text}")
         QMessageBox.warning(self, "Set Parameters Failed",
@@ -1519,6 +1629,16 @@ class MainWindow(QMainWindow):
             resp = self.session.post(f"{self.api_url}/channels/release/{user_name}", json=payload, timeout=2)
             if resp.status_code == 200:
                 logger.info(f"Released channels {selected_channels} for {user_name}")
+                # MaaS queues a reset of the released channels to 0.5 V / 0 ps; wait
+                # for it so the labels refreshed below show the reset values.
+                try:
+                    reset_id = resp.json().get("parameter_reset_id")
+                except (ValueError, AttributeError):
+                    reset_id = None
+                if isinstance(reset_id, str) and reset_id:
+                    status, message = self.wait_for_job(reset_id)
+                    if status != "completed":
+                        logger.error(f"Parameter reset after release not applied ({status}): {message}")
             else:
                 try:
                     detail = resp.json().get("detail", resp.text)

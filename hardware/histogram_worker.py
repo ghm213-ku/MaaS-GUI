@@ -5,7 +5,7 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
-from hardware.worker import normalize_server_url, check_channels_booked, DEFAULT_SERVER_IP
+from hardware.worker import normalize_server_url, check_channels_booked, ws_auth_header, DEFAULT_SERVER_IP
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +70,11 @@ class HistogramWorker(QThread):
             meas_type = endpoint_map.get(self.mode, "histogram-live")
 
             if self.mode == "Correlation":
+                # Time Tagger Correlation: channel_1 is the click (stop) channel and
+                # channel_2 the start channel, so the delay axis is t(click) - t(start).
                 metadata = {
-                    "channel1": self.start_channel,
-                    "channel2": self.click_channel,
+                    "channel1": self.click_channel,
+                    "channel2": self.start_channel,
                     "user_name": self.user_name,
                     "binwidth": int(self.binwidth),
                     "n_bins": int(self.n_values),
@@ -106,7 +108,7 @@ class HistogramWorker(QThread):
             ws_url = f"{self.ws_base_url}/measurements/stream/{self.measurement_id}"
             logger.info(f"Connecting to WebSocket: {ws_url}")
             self.ws = websocket.WebSocket()
-            self.ws.connect(ws_url, timeout=10.0)
+            self.ws.connect(ws_url, timeout=10.0, header=ws_auth_header(self.auth_token))
             self.ws.settimeout(2.0)
             logger.info("WebSocket connected successfully!")
             
