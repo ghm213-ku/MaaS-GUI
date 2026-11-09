@@ -294,6 +294,15 @@ class SITimeAxisItem(pg.AxisItem):
 
 
 class MainWindow(QMainWindow):
+    # Coincidences time steps as (label, refresh rate in Hz). Only steps that
+    # are a whole number of Hz are offered, since the backend takes an int.
+    COINC_TIME_STEPS = [
+        ("10 ms", 100), ("20 ms", 50), ("40 ms", 25), ("50 ms", 20),
+        ("100 ms", 10), ("200 ms", 5), ("500 ms", 2), ("1 s", 1),
+    ]
+    COINC_DEFAULT_REFRESH_HZ = 25
+    COINC_DEFAULT_POINTS = 100
+
     def __init__(self, force_mock=False, server_ip=None):
         super().__init__()
         self.force_mock = force_mock
@@ -1694,7 +1703,29 @@ class MainWindow(QMainWindow):
         self.coinc_binwidth_input.setMaximumWidth(80)
         self.coinc_binwidth_input.setToolTip("Coincidence window in picoseconds (default: 1000 ps = 1 ns)")
         controls.addWidget(self.coinc_binwidth_input)
-        
+
+        # Time between plotted points. The backend's live coincidences stream
+        # publishes one value per refresh period (1 / refresh_rate) and ignores
+        # binwidth / n_values, so the step is set through the refresh rate,
+        # which must be a whole number of Hz (1-100).
+        controls.addSpacing(10)
+        controls.addWidget(QLabel("Time step:"))
+        self.coinc_step_combo = QComboBox()
+        for label, hz in self.COINC_TIME_STEPS:
+            self.coinc_step_combo.addItem(label, hz)
+        self.coinc_step_combo.setCurrentIndex(
+            [hz for _, hz in self.COINC_TIME_STEPS].index(self.COINC_DEFAULT_REFRESH_HZ))
+        self.coinc_step_combo.setToolTip("Time between plotted points (sets the backend refresh rate)")
+        self.coinc_step_combo.currentIndexChanged.connect(self.on_coinc_time_step_changed)
+        controls.addWidget(self.coinc_step_combo)
+
+        controls.addWidget(QLabel("Points:"))
+        self.coinc_points_input = QLineEdit(str(self.COINC_DEFAULT_POINTS))
+        self.coinc_points_input.setMaximumWidth(60)
+        self.coinc_points_input.setToolTip("Number of most recent points kept on the plot")
+        self.coinc_points_input.editingFinished.connect(self.on_coinc_points_changed)
+        controls.addWidget(self.coinc_points_input)
+
         controls.addSpacing(20)
         controls.addWidget(QLabel("Channels:"))
         self.coinc_channels_layout = QHBoxLayout()
@@ -1723,8 +1754,13 @@ class MainWindow(QMainWindow):
         
         self.coinc_plot_widget = pg.PlotWidget(axisItems={'bottom': SITimeAxisItem(orientation='bottom')})
         self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.coinc_plot_widget.setLabel('bottom', 'Time steps')
-        self.coinc_plot_widget.setLabel('left', 'Coincidence Counts')
+        self.coinc_plot_widget.setLabel('bottom', 'Time (s)')
+        # The backend uses TimeTagger.Countrate, which reports the average
+        # rate in counts/s since the measurement started.
+        self.coinc_plot_widget.setLabel('left', 'Avg. coincidence rate (counts/s)')
+        self.coinc_max_points = self.COINC_DEFAULT_POINTS
+        self.coinc_refresh_hz = self.COINC_DEFAULT_REFRESH_HZ
+        self.coinc_xdata_streams = []
         self.coinc_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = []
@@ -1755,6 +1791,49 @@ class MainWindow(QMainWindow):
         layout.addLayout(coinc_plot_container)
 
         self.coinc_worker = None
+
+    def on_coinc_time_step_changed(self, _index=None):
+        # The refresh rate is fixed when the backend measurement starts, so a
+        # new step only takes effect by restarting a running measurement.
+        if self.coinc_worker is not None:
+            self._retire_worker(self.coinc_worker)
+            self.coinc_worker = None
+            self.start_coincidences_measurement()
+
+    def _parse_coinc_points(self):
+        try:
+            points = int(self.coinc_points_input.text().strip())
+        except ValueError:
+            return None
+        return points if points >= 2 else None
+
+    def on_coinc_points_changed(self):
+        points = self._parse_coinc_points()
+        if points is None:
+            self.coinc_points_input.setText(str(self.coinc_max_points))
+            return
+        self.coinc_max_points = points
+        for i in range(len(self.coinc_ydata_streams)):
+            self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-points:]
+            if i < len(self.coinc_xdata_streams):
+                self.coinc_xdata_streams[i] = self.coinc_xdata_streams[i][-points:]
+            if i < len(self.coinc_plot_curves):
+                self.coinc_plot_curves[i].setData(self.coinc_xdata_streams[i], self.coinc_ydata_streams[i])
+
+    def _append_coinc_point(self, i, val):
+        """Append one value to stream i, stamped with its elapsed time in seconds."""
+        if len(self.coinc_xdata_streams) != len(self.coinc_ydata_streams):
+            self.coinc_xdata_streams = [[] for _ in self.coinc_ydata_streams]
+            self.coinc_frame_counts = [0] * len(self.coinc_ydata_streams)
+        step_s = 1.0 / self.coinc_refresh_hz
+        self.coinc_frame_counts[i] += 1
+        self.coinc_xdata_streams[i].append(self.coinc_frame_counts[i] * step_s)
+        self.coinc_ydata_streams[i].append(val)
+        n = self.coinc_max_points
+        if len(self.coinc_ydata_streams[i]) > n:
+            self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-n:]
+            self.coinc_xdata_streams[i] = self.coinc_xdata_streams[i][-n:]
+        self.coinc_plot_curves[i].setData(self.coinc_xdata_streams[i], self.coinc_ydata_streams[i])
 
     def coinc_toggle_zoom(self, checked):
         mode = pg.ViewBox.RectMode if checked else pg.ViewBox.PanMode
@@ -1906,7 +1985,15 @@ class MainWindow(QMainWindow):
         palette = ['#00ff00', '#00e5ff', '#ffaa00', '#ff00aa', '#ffff00', '#aa00ff', '#ff5500', '#00aaff']
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = [[] for _ in coincidences]
+        self.coinc_xdata_streams = [[] for _ in coincidences]
+        self.coinc_frame_counts = [0] * len(coincidences)
         self.coinc_groups = coincidences
+        self.coinc_refresh_hz = int(self.coinc_step_combo.currentData())
+        points = self._parse_coinc_points()
+        if points is not None:
+            self.coinc_max_points = points
+        else:
+            self.coinc_points_input.setText(str(self.coinc_max_points))
 
         for idx, group in enumerate(coincidences):
             color = palette[idx % len(palette)]
@@ -1931,7 +2018,7 @@ class MainWindow(QMainWindow):
             coincidences=coincidences,
             user_name=self.login_username,
             coincidence_window=window_ps,
-            binwidth=int(1e9),
+            refresh_rate=self.coinc_refresh_hz,
             auth_token=self.auth_token,
             is_mock=self.force_mock,
             server_ip=self.server_ip)
@@ -1982,6 +2069,7 @@ class MainWindow(QMainWindow):
             
         self.coinc_ydata = []
         self.coinc_ydata_streams = []
+        self.coinc_xdata_streams = []
         self.coinc_plot_curves = []
         self.coinc_plot_widget.clear()
         self._clear_coinc_legend()
@@ -2019,12 +2107,7 @@ class MainWindow(QMainWindow):
 
         for i in range(len(self.coinc_plot_curves)):
             if i < arr.shape[0]:
-                row = arr[i]
-                val = float(np.sum(row))
-                self.coinc_ydata_streams[i].append(val)
-                if len(self.coinc_ydata_streams[i]) > 100:
-                    self.coinc_ydata_streams[i] = self.coinc_ydata_streams[i][-100:]
-                self.coinc_plot_curves[i].setData(self.coinc_ydata_streams[i])
+                self._append_coinc_point(i, float(np.sum(arr[i])))
 
         self.coinc_ydata = self.coinc_ydata_streams[0] if self.coinc_ydata_streams else []
 
@@ -2035,11 +2118,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'coinc_ydata_streams') or len(self.coinc_ydata_streams) != len(self.coinc_plot_curves):
             self.coinc_ydata_streams = [[] for _ in self.coinc_plot_curves]
 
-        val = float(np.sum(stream_data))
-        self.coinc_ydata_streams[stream_index].append(val)
-        if len(self.coinc_ydata_streams[stream_index]) > 100:
-            self.coinc_ydata_streams[stream_index] = self.coinc_ydata_streams[stream_index][-100:]
-        self.coinc_plot_curves[stream_index].setData(self.coinc_ydata_streams[stream_index])
+        self._append_coinc_point(stream_index, float(np.sum(stream_data)))
         if stream_index == 0:
             self.coinc_ydata = self.coinc_ydata_streams[0]
 

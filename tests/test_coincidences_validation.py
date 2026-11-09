@@ -534,3 +534,63 @@ def test_coincidences_zoom_toggle_switches_mouse_mode(qtbot):
     assert vb.state['mouseMode'] == pg.ViewBox.RectMode
     window.coinc_btn_zoom.click()
     assert vb.state['mouseMode'] == pg.ViewBox.PanMode
+
+
+def test_coincidences_time_step_sets_refresh_rate_and_x_axis(qtbot, fake_workers):
+    """The chosen time step is sent as the refresh rate and spaces the x values in seconds."""
+    import numpy as np
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.get_selected_channels = lambda: [1, 2]
+    window.coinc_boxes[0].setText("1, 2")
+
+    window.coinc_step_combo.setCurrentIndex(window.coinc_step_combo.findText("100 ms"))
+    window.start_coincidences_measurement()
+    assert coinc_kwargs(fake_workers)["refresh_rate"] == 10
+
+    for v in (1.0, 2.0, 3.0):
+        window.update_coincidences_plot(np.array([[v]]))
+    assert window.coinc_xdata_streams[0] == pytest.approx([0.1, 0.2, 0.3])
+    assert window.coinc_ydata_streams[0] == [1.0, 2.0, 3.0]
+
+
+def test_coincidences_changing_time_step_restarts_running_measurement(qtbot, fake_workers):
+    import numpy as np
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.get_selected_channels = lambda: [1, 2]
+    window.coinc_boxes[0].setText("1, 2")
+    window.start_coincidences_measurement()
+    old_worker = window.coinc_worker
+    window.update_coincidences_plot(np.array([[5.0]]))
+
+    window.coinc_step_combo.setCurrentIndex(window.coinc_step_combo.findText("1 s"))
+
+    assert window.coinc_worker is not None and window.coinc_worker is not old_worker
+    assert coinc_kwargs(fake_workers)["refresh_rate"] == 1
+    assert window.coinc_ydata_streams == [[]]
+
+
+def test_coincidences_points_limit_history(qtbot):
+    import numpy as np
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.get_selected_channels = lambda: [1, 2]
+    window.coinc_boxes[0].setText("1, 2")
+    window.coinc_points_input.setText("5")
+    window.start_coincidences_measurement()
+
+    for v in range(8):
+        window.update_coincidences_plot(np.array([[float(v)]]))
+    assert window.coinc_ydata_streams[0] == [3.0, 4.0, 5.0, 6.0, 7.0]
+    assert len(window.coinc_xdata_streams[0]) == 5
+
+    # Shrinking the limit while running trims the existing history.
+    window.coinc_points_input.setText("2")
+    window.on_coinc_points_changed()
+    assert window.coinc_ydata_streams[0] == [6.0, 7.0]
+
+    # Invalid input is rejected and the previous value restored.
+    window.coinc_points_input.setText("abc")
+    window.on_coinc_points_changed()
+    assert window.coinc_points_input.text() == "2"
