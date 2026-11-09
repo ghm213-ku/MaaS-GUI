@@ -216,7 +216,7 @@ class CoincidencesWorker(QThread):
                                     self.running = False
                                     break
                         except Exception as e:
-                            logger.error(f"Error parsing websocket message: {e}")
+                            logger.exception(f"Error parsing websocket message: {e}")
                 except websocket.WebSocketTimeoutException:
                     pass
                 except websocket.WebSocketConnectionClosedException:
@@ -225,7 +225,7 @@ class CoincidencesWorker(QThread):
                     break
                 
         except Exception as e:
-            logger.error(f"Hardware/Network Error: {e}")
+            logger.exception(f"Hardware/Network Error: {e}")
         finally:
             self._perform_teardown()
 
