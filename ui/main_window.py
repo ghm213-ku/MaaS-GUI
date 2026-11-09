@@ -1671,10 +1671,23 @@ class MainWindow(QMainWindow):
         self.coinc_btn_stop.setEnabled(False)
         self.coinc_btn_stop.clicked.connect(self.stop_coincidences_measurement)
         
+        self.coinc_btn_zoom = QPushButton("⌕")
+        self.coinc_btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.coinc_btn_zoom.setCheckable(True)
+        self.coinc_btn_zoom.setToolTip("Toggle Zoom Mode (drag a box to zoom)")
+        self.coinc_btn_zoom.clicked.connect(self.coinc_toggle_zoom)
+
+        self.coinc_btn_auto_range = QPushButton("⤢")
+        self.coinc_btn_auto_range.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.coinc_btn_auto_range.setToolTip("Enable continuous Auto Range")
+        self.coinc_btn_auto_range.clicked.connect(self.coinc_force_auto_range)
+
         controls.addWidget(self.coinc_btn_play_pause)
         controls.addWidget(self.coinc_btn_stop)
         controls.addWidget(self.coinc_btn_reset)
-        
+        controls.addWidget(self.coinc_btn_zoom)
+        controls.addWidget(self.coinc_btn_auto_range)
+
         controls.addSpacing(20)
         controls.addWidget(QLabel("Coincidence Window (ps):"))
         self.coinc_binwidth_input = QLineEdit("1000")
@@ -1712,13 +1725,50 @@ class MainWindow(QMainWindow):
         self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self.coinc_plot_widget.setLabel('bottom', 'Time steps')
         self.coinc_plot_widget.setLabel('left', 'Coincidence Counts')
-        self.coinc_legend = self.coinc_plot_widget.addLegend(offset=(10, 10))
+        self.coinc_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = []
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
-        layout.addWidget(self.coinc_plot_widget)
-        
+
+        # Plot with an overlaid checkbox legend (same as the Counter tab), so
+        # individual coincidence groups can be shown / hidden.
+        coinc_plot_container = QGridLayout()
+        coinc_plot_container.setContentsMargins(0, 0, 0, 0)
+        coinc_plot_container.addWidget(self.coinc_plot_widget, 0, 0)
+
+        self.coinc_legend_layout = QVBoxLayout()
+        self.coinc_legend_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.coinc_legend_layout.setContentsMargins(10, 10, 10, 10)
+
+        coinc_legend_widget = QWidget()
+        coinc_legend_widget.setObjectName("LegendWidget")
+        coinc_legend_widget.setLayout(self.coinc_legend_layout)
+
+        self.coinc_legend_scroll = QScrollArea()
+        self.coinc_legend_scroll.setWidget(coinc_legend_widget)
+        self.coinc_legend_scroll.setWidgetResizable(True)
+        self.coinc_legend_scroll.setFixedSize(180, 250)
+        self.coinc_legend_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; } QWidget#LegendWidget { background-color: rgba(255, 255, 255, 220); border: 1px solid #ccc; border-radius: 6px; }")
+        self.coinc_legend_scroll.hide()
+        coinc_plot_container.addWidget(self.coinc_legend_scroll, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+
+        layout.addLayout(coinc_plot_container)
+
         self.coinc_worker = None
+
+    def coinc_toggle_zoom(self, checked):
+        mode = pg.ViewBox.RectMode if checked else pg.ViewBox.PanMode
+        self.coinc_plot_widget.getViewBox().setMouseMode(mode)
+
+    def coinc_force_auto_range(self):
+        self.coinc_plot_widget.enableAutoRange()
+
+    def _clear_coinc_legend(self):
+        for i in reversed(range(self.coinc_legend_layout.count())):
+            widget = self.coinc_legend_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+        self.coinc_legend_scroll.hide()
 
     def add_coincidence_box(self):
         box = QLineEdit()
@@ -1850,10 +1900,8 @@ class MainWindow(QMainWindow):
             coincidences.append(group_channels)
 
         self.coinc_plot_widget.clear()
-        if hasattr(self, 'coinc_legend') and self.coinc_legend is not None:
-            self.coinc_legend.clear()
-        else:
-            self.coinc_legend = self.coinc_plot_widget.addLegend(offset=(10, 10))
+        self._clear_coinc_legend()
+        self.coinc_plot_widget.enableAutoRange()
 
         palette = ['#00ff00', '#00e5ff', '#ffaa00', '#ff00aa', '#ffff00', '#aa00ff', '#ff5500', '#00aaff']
         self.coinc_plot_curves = []
@@ -1866,6 +1914,15 @@ class MainWindow(QMainWindow):
             label = f"Coinc {group}"
             curve = self.coinc_plot_widget.plot(pen=pen, name=label)
             self.coinc_plot_curves.append(curve)
+
+            cb = QCheckBox(label)
+            cb.setChecked(True)
+            cb.setStyleSheet(f"color: {color}; font-weight: bold;")
+            cb.stateChanged.connect(lambda state, c=curve: c.setVisible(state == Qt.CheckState.Checked.value))
+            self.coinc_legend_layout.addWidget(cb)
+
+        if coincidences:
+            self.coinc_legend_scroll.show()
 
         self.coinc_plot_curve = self.coinc_plot_curves[0] if self.coinc_plot_curves else None
         self.coinc_ydata = []
@@ -1927,8 +1984,7 @@ class MainWindow(QMainWindow):
         self.coinc_ydata_streams = []
         self.coinc_plot_curves = []
         self.coinc_plot_widget.clear()
-        if hasattr(self, 'coinc_legend') and self.coinc_legend is not None:
-            self.coinc_legend.clear()
+        self._clear_coinc_legend()
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))

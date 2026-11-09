@@ -495,3 +495,42 @@ def test_coincidences_reset_clears_multi_streams(qtbot):
     assert window.coinc_plot_curves == []
 
 
+
+
+def test_coincidences_legend_checkboxes_toggle_curves(qtbot):
+    """Each coincidence group gets a legend checkbox that shows / hides its curve."""
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.get_selected_channels = lambda: [1, 2, 3]
+
+    window.coinc_boxes[0].setText("1, 2")
+    window.add_coincidence_box()
+    window.coinc_boxes[1].setText("2, 3")
+    window.start_coincidences_measurement()
+
+    checkboxes = [window.coinc_legend_layout.itemAt(i).widget()
+                  for i in range(window.coinc_legend_layout.count())]
+    assert [cb.text() for cb in checkboxes] == ["Coinc [1, 2]", "Coinc [2, 3]"]
+    assert not window.coinc_legend_scroll.isHidden()
+
+    checkboxes[1].setChecked(False)
+    assert window.coinc_plot_curves[0].isVisible()
+    assert not window.coinc_plot_curves[1].isVisible()
+    checkboxes[1].setChecked(True)
+    assert window.coinc_plot_curves[1].isVisible()
+
+    window.reset_coincidences_measurement()
+    assert window.coinc_legend_layout.count() == 0
+    assert window.coinc_legend_scroll.isHidden()
+
+
+def test_coincidences_zoom_toggle_switches_mouse_mode(qtbot):
+    import pyqtgraph as pg
+    window = MainWindow()
+    qtbot.addWidget(window)
+    vb = window.coinc_plot_widget.getViewBox()
+
+    window.coinc_btn_zoom.click()
+    assert vb.state['mouseMode'] == pg.ViewBox.RectMode
+    window.coinc_btn_zoom.click()
+    assert vb.state['mouseMode'] == pg.ViewBox.PanMode
