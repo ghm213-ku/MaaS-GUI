@@ -5,6 +5,7 @@ import base64
 import logging
 import os
 import time
+import weakref
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +298,44 @@ class SITimeAxisItem(pg.AxisItem):
             
             strings.append(formatted)
         return strings
+
+
+class HistogramCursor:
+    """Green vertical line following the mouse, with the nearest bin's time and counts.
+
+    ``get_xy`` returns the plotted (x seconds, y counts) arrays, or (None, None).
+    Call ``attach()`` again after ``plot_widget.clear()``.
+    """
+
+    def __init__(self, plot_widget, get_xy):
+        self.plot_widget = plot_widget
+        self.get_xy = get_xy
+        self.v_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('g', width=2))
+        self.label = pg.TextItem(anchor=(0, 1), color='w', fill=(0, 0, 0, 200))
+        self.attach()
+        plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
+
+    def attach(self):
+        self.plot_widget.addItem(self.v_line, ignoreBounds=True)
+        self.plot_widget.addItem(self.label, ignoreBounds=True)
+        self.label.setText("")
+
+    def mouse_moved(self, pos):
+        if not self.plot_widget.sceneBoundingRect().contains(pos):
+            return
+        point = self.plot_widget.plotItem.vb.mapSceneToView(pos)
+        x_val = point.x()
+        self.v_line.setPos(x_val)
+
+        x, y = self.get_xy()
+        if x is None or y is None or len(x) == 0 or len(x) != len(y):
+            return
+        i = int(np.clip(np.searchsorted(x, x_val), 1, len(x) - 1))
+        if abs(x[i - 1] - x_val) <= abs(x[i] - x_val):
+            i -= 1
+        time_text = pg.siFormat(float(x[i]), suffix='s', precision=4)
+        self.label.setHtml(f"<div style='text-align: left'>t: {time_text}<br>Counts: {y[i]:g}</div>")
+        self.label.setPos(x_val, point.y())
 
 
 class MainWindow(QMainWindow):
@@ -2350,6 +2389,8 @@ class MainWindow(QMainWindow):
         self.hist_region.setZValue(10)
         self.hist_region.hide()
         self.hist_plot_widget.addItem(self.hist_region)
+        self.hist_cursor = HistogramCursor(
+            self.hist_plot_widget, self._histogram_xy_getter('hist_x_buffer', 'hist_data_buffer'))
 
         self.hist_filter_plot_widget = pg.PlotWidget()
         self.hist_filter_plot_widget.showGrid(x=True, y=True, alpha=0.3)
@@ -2485,6 +2526,8 @@ class MainWindow(QMainWindow):
         self.hist2_region.setZValue(10)
         self.hist2_region.hide()
         self.hist2_plot_widget.addItem(self.hist2_region)
+        self.hist2_cursor = HistogramCursor(
+            self.hist2_plot_widget, self._histogram_xy_getter('hist2_x_buffer', 'hist2_data_buffer'))
 
         self.hist2_filter_plot_widget = pg.PlotWidget()
         self.hist2_filter_plot_widget.showGrid(x=True, y=True, alpha=0.3)
@@ -3079,6 +3122,7 @@ class MainWindow(QMainWindow):
             self.hist_plot_widget.clear()
             self.hist_plot_curve = self.hist_plot_widget.plot(pen='b')
             self.hist_plot_widget.addItem(self.hist_region)
+            self.hist_cursor.attach()
             if hasattr(self, 'hist_region_2'):
                 self.hist_plot_widget.addItem(self.hist_region_2)
             if not self.hist_btn_filter.isChecked():
@@ -3109,6 +3153,7 @@ class MainWindow(QMainWindow):
             return
 
         self.hist_worker.newDataReady.connect(self.update_histogram_plot)
+        self.hist_worker.streamProblem.connect(self.show_stream_problem)
         self.hist_worker.finished.connect(self.on_histogram_worker_finished)
         self.hist_worker.start()
 
@@ -3140,6 +3185,7 @@ class MainWindow(QMainWindow):
             self.hist2_plot_widget.clear()
             self.hist2_plot_curve = self.hist2_plot_widget.plot(pen='b')
             self.hist2_plot_widget.addItem(self.hist2_region)
+            self.hist2_cursor.attach()
             if hasattr(self, 'hist2_region_2'):
                 self.hist2_plot_widget.addItem(self.hist2_region_2)
             if not self.hist2_btn_filter.isChecked():
@@ -3170,6 +3216,7 @@ class MainWindow(QMainWindow):
             return
 
         self.hist2_worker.newDataReady.connect(self.update_histogram_plot_2)
+        self.hist2_worker.streamProblem.connect(self.show_stream_problem)
         self.hist2_worker.finished.connect(self.on_histogram_worker_finished_2)
         self.hist2_worker.start()
 
@@ -3477,6 +3524,26 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'hist2_region_2'):
                 self.hist2_region_2.hide()
 
+    def _histogram_xy_getter(self, x_attr, y_attr):
+        """Cursor data source holding only a weak reference to the window.
+
+        A strong reference would make window -> cursor -> getter -> window a cycle,
+        so the window (and its plots) would be freed by the cyclic GC at some
+        arbitrary later moment instead of when it is closed.
+        """
+        window_ref = weakref.ref(self)
+
+        def get_xy():
+            window = window_ref()
+            if window is None:
+                return None, None
+            return getattr(window, x_attr, None), getattr(window, y_attr, None)
+        return get_xy
+
+    def show_stream_problem(self, message):
+        """Show a live-stream warning in the status bar without interrupting the user."""
+        self.statusBar().showMessage(message, 15000)
+
     def update_histogram_plot(self, x_data, y_data):
         if self.hist_plot_curve:
             try:
@@ -3760,6 +3827,7 @@ class MainWindow(QMainWindow):
             
         self.hist_plot_widget.clear()
         self.hist_plot_widget.addItem(self.hist_region)
+        self.hist_cursor.attach()
         if hasattr(self, 'hist_region_2'):
             self.hist_plot_widget.addItem(self.hist_region_2)
         if not self.hist_btn_filter.isChecked():
@@ -3793,6 +3861,7 @@ class MainWindow(QMainWindow):
             
         self.hist2_plot_widget.clear()
         self.hist2_plot_widget.addItem(self.hist2_region)
+        self.hist2_cursor.attach()
         if hasattr(self, 'hist2_region_2'):
             self.hist2_plot_widget.addItem(self.hist2_region_2)
         if not self.hist2_btn_filter.isChecked():
