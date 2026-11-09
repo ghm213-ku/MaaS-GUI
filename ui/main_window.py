@@ -16,11 +16,25 @@ from PyQt6.QtWidgets import (
                              QTabWidget, QGridLayout, QScrollArea, QCheckBox,
                              QFrame, QLineEdit, QDialog, QFormLayout, QSizePolicy, QComboBox, QStackedWidget)
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThreadPool
 
-from hardware.worker import CountRateWorker, normalize_server_url
+from hardware.worker import CountRateWorker, normalize_server_url, DEFAULT_SERVER_IP
 from hardware.histogram_worker import HistogramWorker
 from hardware.coincidences_worker import CoincidencesWorker
+from hardware.health import HealthCheckTask
+
+# How often the home page re-checks MaaS health while logged in.
+MAAS_HEALTH_INTERVAL_MS = 15000
+
+MAAS_STATE_STYLES = {
+    # state: (label, dot colour, text colour)
+    "live": ("Live", "#22c55e", "#15803d"),
+    "degraded": ("Degraded", "#f59e0b", "#b45309"),
+    "error": ("Error", "#ef4444", "#b91c1c"),
+    "offline": ("Offline", "#ef4444", "#b91c1c"),
+    "checking": ("Checking\u2026", "#9ca3af", "#6b7280"),
+    "testing": ("Testing mode", "#9ca3af", "#6b7280"),
+}
 
 class ChannelConfigPopup(QDialog):
     def __init__(self, current_trigger, current_delay, parent=None):
@@ -285,8 +299,8 @@ class MainWindow(QMainWindow):
         self.force_mock = force_mock
 
         if server_ip is None:
-            server_ip = os.environ.get("MAAS_IP", os.environ.get("MAAS_HOST", "127.0.0.1"))
-        self.server_ip = str(server_ip).strip() if server_ip else "127.0.0.1"
+            server_ip = os.environ.get("MAAS_IP", os.environ.get("MAAS_HOST", DEFAULT_SERVER_IP))
+        self.server_ip = str(server_ip).strip() if server_ip else DEFAULT_SERVER_IP
         self.server_url, self.ws_server_url = normalize_server_url(self.server_ip)
         self.api_url = f"{self.server_url}/api/v1"
         self.ws_api_url = f"{self.ws_server_url}/api/v1"
@@ -302,6 +316,13 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.old_workers = []
         self.session = requests.Session()
+
+        # MaaS health status shown on the home page
+        self.maas_health = None
+        self._health_check_running = False
+        self.health_timer = QTimer(self)
+        self.health_timer.setInterval(MAAS_HEALTH_INTERVAL_MS)
+        self.health_timer.timeout.connect(self.refresh_maas_status)
         
         self.setStyleSheet("""
             QMainWindow, QDialog {
@@ -362,7 +383,7 @@ class MainWindow(QMainWindow):
 
     def set_server_ip(self, ip_address: str):
         if not ip_address or not str(ip_address).strip():
-            ip_address = "127.0.0.1"
+            ip_address = DEFAULT_SERVER_IP
         self.server_ip = str(ip_address).strip()
         self.server_url, self.ws_server_url = normalize_server_url(self.server_ip)
         self.api_url = f"{self.server_url}/api/v1"
@@ -371,6 +392,10 @@ class MainWindow(QMainWindow):
             self.login_server_ip_input.setText(self.server_ip)
         if hasattr(self, 'account_server_ip_input') and self.account_server_ip_input.text() != self.server_ip:
             self.account_server_ip_input.setText(self.server_ip)
+        # Re-check health right away when the server changes after login.
+        if getattr(self, 'auth_token', "") and hasattr(self, 'maas_state_label'):
+            self.maas_health = None
+            self.refresh_maas_status()
 
     def build_login_screen(self):
         self.login_widget = QWidget()
@@ -394,7 +419,7 @@ class MainWindow(QMainWindow):
         self.login_password_input.setFixedWidth(180)
         self.login_password_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 2px;")
 
-        self.login_server_ip_input = QLineEdit(getattr(self, 'server_ip', '127.0.0.1'))
+        self.login_server_ip_input = QLineEdit(getattr(self, 'server_ip', DEFAULT_SERVER_IP))
         self.login_server_ip_input.setPlaceholderText("MaaS IP (e.g. 192.168.1.100)")
         self.login_server_ip_input.setFixedWidth(180)
         self.login_server_ip_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 2px;")
@@ -933,6 +958,11 @@ class MainWindow(QMainWindow):
 
         # Load the current channel bookings from MaaS so the home page shows them right away
         self.fetch_booked_channels()
+
+        # Show MaaS connection/health on the home page and keep it up to date
+        self.refresh_maas_status()
+        if not getattr(self, 'force_mock', False):
+            self.health_timer.start()
         
         # Switch to main app
         self.stacked_widget.setCurrentWidget(self.main_app_widget)
@@ -1005,7 +1035,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(server_desc)
 
         server_form = QFormLayout()
-        self.account_server_ip_input = QLineEdit(getattr(self, 'server_ip', '127.0.0.1'))
+        self.account_server_ip_input = QLineEdit(getattr(self, 'server_ip', DEFAULT_SERVER_IP))
         self.account_server_ip_input.setPlaceholderText("e.g. 192.168.1.100 or 192.168.1.100:8000")
         self.account_server_ip_input.setFixedWidth(220)
         self.account_server_ip_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px;")
@@ -1134,9 +1164,161 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Connection error: {e}")
 
+    def build_maas_status_panel(self):
+        """Card at the top of the home page showing MaaS liveness and connection details."""
+        panel = QFrame()
+        panel.setObjectName("maasStatusPanel")
+        panel.setStyleSheet("""
+            QFrame#maasStatusPanel {
+                background-color: #fafafa;
+                border: 1px solid #eaeaea;
+                border-radius: 6px;
+            }
+            QFrame#maasStatusPanel QLabel { background: transparent; border: none; }
+        """)
+        outer = QVBoxLayout(panel)
+        outer.setContentsMargins(12, 8, 12, 8)
+        outer.setSpacing(4)
+
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        title = QLabel("MaaS Service")
+        title.setStyleSheet("font-size: 13px; font-weight: 600; color: #111;")
+        top.addWidget(title)
+
+        self.maas_status_dot = QLabel()
+        self.maas_status_dot.setFixedSize(10, 10)
+        top.addWidget(self.maas_status_dot, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.maas_state_label = QLabel()
+        top.addWidget(self.maas_state_label)
+        top.addStretch()
+
+        self.maas_last_checked_label = QLabel()
+        self.maas_last_checked_label.setStyleSheet("color: #888; font-size: 11px;")
+        top.addWidget(self.maas_last_checked_label)
+
+        self.btn_refresh_maas_status = QPushButton("Refresh")
+        self.btn_refresh_maas_status.setToolTip("Check the MaaS /health endpoint now")
+        self.btn_refresh_maas_status.setStyleSheet("padding: 2px 10px; font-size: 12px;")
+        self.btn_refresh_maas_status.clicked.connect(self.refresh_maas_status)
+        top.addWidget(self.btn_refresh_maas_status)
+        outer.addLayout(top)
+
+        self.maas_details_label = QLabel()
+        self.maas_details_label.setWordWrap(True)
+        self.maas_details_label.setTextFormat(Qt.TextFormat.RichText)
+        self.maas_details_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.maas_details_label.setStyleSheet("color: #555; font-size: 12px;")
+        outer.addWidget(self.maas_details_label)
+
+        self._set_maas_state("checking")
+        self._update_maas_details()
+        return panel
+
+    def _set_maas_state(self, state, tooltip=""):
+        label, dot, text_color = MAAS_STATE_STYLES.get(state, MAAS_STATE_STYLES["offline"])
+        self.maas_state = state
+        self.maas_status_dot.setStyleSheet(f"background-color: {dot}; border-radius: 5px;")
+        self.maas_state_label.setText(label)
+        self.maas_state_label.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {text_color};")
+        self.maas_state_label.setToolTip(tooltip)
+        self.maas_status_dot.setToolTip(tooltip)
+
+    def _update_maas_details(self):
+        """Render the connection details line from the current window/health state."""
+        from html import escape
+        from datetime import datetime
+
+        def item(name, value):
+            return f"<span style='color:#999'>{escape(name)}:</span> {escape(str(value))}"
+
+        parts = [item("Server", self.server_url)]
+
+        h = self.maas_health
+        if getattr(self, 'force_mock', False):
+            parts.append(item("Data", "generated test data (not connected)"))
+        elif h is not None:
+            if h.get("latency_ms") is not None:
+                parts.append(item("Latency", f"{h['latency_ms']:.0f} ms"))
+            if h.get("status"):
+                parts.append(item("Health", h["status"]))
+            for key, value in h.get("details", {}).items():
+                parts.append(item(key.replace("_", " ").capitalize(), value))
+            if h.get("error"):
+                parts.append(item("Error", h["error"]))
+
+        if self.login_username:
+            role = f" ({self.user_role})" if self.user_role else ""
+            parts.append(item("User", f"{self.login_username}{role}"))
+        exp = self.jwt_payload.get("exp") if isinstance(self.jwt_payload, dict) else None
+        if isinstance(exp, (int, float)):
+            try:
+                exp_dt = datetime.fromtimestamp(exp)
+                expired = " (expired)" if exp_dt < datetime.now() else ""
+                parts.append(item("Session expires", exp_dt.strftime("%Y-%m-%d %H:%M") + expired))
+            except (OverflowError, OSError, ValueError):
+                pass
+
+        self.maas_details_label.setText(" &nbsp;\u00b7&nbsp; ".join(parts))
+
+    def refresh_maas_status(self):
+        """Start a background health check (no-op if one is already in flight)."""
+        if not hasattr(self, 'maas_state_label'):
+            return
+        if getattr(self, 'force_mock', False):
+            self.maas_health = None
+            self._set_maas_state("testing", "Running with -testing: no MaaS connection is used.")
+            self.maas_last_checked_label.setText("")
+            self._update_maas_details()
+            return
+        if self._health_check_running:
+            return
+        self._health_check_running = True
+        if self.maas_health is None:
+            self._set_maas_state("checking")
+        self.btn_refresh_maas_status.setEnabled(False)
+        self._update_maas_details()
+        self._start_health_check(self.server_url)
+
+    def _start_health_check(self, server_url):
+        """Run the /health request on a pool thread so a slow/offline server never freezes the UI."""
+        task = HealthCheckTask(server_url)
+        task.signals.finished.connect(self.on_maas_health_result)
+        # Keep a reference so the signals object outlives the pool thread's emit.
+        self._health_task = task
+        QThreadPool.globalInstance().start(task)
+
+    def on_maas_health_result(self, result):
+        self._health_check_running = False
+        self.btn_refresh_maas_status.setEnabled(True)
+        if result.get("server_url") != self.server_url:
+            # The server was changed while this check was running; check the new one.
+            self.refresh_maas_status()
+            return
+
+        self.maas_health = result
+        state = result.get("state", "offline")
+        tooltip = {
+            "live": "MaaS /health responded successfully.",
+            "degraded": f"MaaS is reachable but reports status '{result.get('status')}'.",
+            "error": f"MaaS /health returned HTTP {result.get('http_status')}.",
+            "offline": f"Cannot reach MaaS: {result.get('error')}",
+        }.get(state, "")
+        if state != getattr(self, 'maas_state', None):
+            logger.info(f"MaaS status changed to {state} ({self.server_url})")
+        self._set_maas_state(state, tooltip)
+        checked_at = result.get("checked_at")
+        self.maas_last_checked_label.setText(
+            f"Checked {checked_at.strftime('%H:%M:%S')}" if checked_at else "")
+        self._update_maas_details()
+
     def build_channels_setup_tab(self):
         self.setup_tab = QWidget()
         layout = QVBoxLayout(self.setup_tab)
+
+        self.maas_status_panel = self.build_maas_status_panel()
+        layout.addWidget(self.maas_status_panel)
         
         # User Name input
         user_layout = QHBoxLayout()
@@ -3349,6 +3531,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         logger.info("Application is closing. Tearing down hardware and measurements...")
+        self.health_timer.stop()
         
         if hasattr(self, 'old_workers'):
             for old_worker in self.old_workers:

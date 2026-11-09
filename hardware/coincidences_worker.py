@@ -5,7 +5,7 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
-from hardware.worker import normalize_server_url, check_channels_booked
+from hardware.worker import normalize_server_url, check_channels_booked, DEFAULT_SERVER_IP
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class CoincidencesWorker(QThread):
         coincidence_window=1000,
         timestamp="Last",
         stream_index=None,
-        server_ip="127.0.0.1",
+        server_ip=DEFAULT_SERVER_IP,
     ):
         super().__init__()
         # Normalize coincidences input into list of lists: [[ch1, ch2, ...], ...]

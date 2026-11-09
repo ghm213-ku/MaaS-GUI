@@ -9,13 +9,16 @@ import atexit
 logger = logging.getLogger(__name__)
 
 
-def normalize_server_url(server_ip="127.0.0.1", default_port=8000):
+# Default MaaS server address, used when no IP is entered or set via MAAS_IP / MAAS_HOST.
+DEFAULT_SERVER_IP = "10.51.49.251"
+
+
+def normalize_server_url(server_ip=DEFAULT_SERVER_IP, default_port=8000):
     """
     Normalizes a server IP address, hostname, or URL string into HTTP and WebSocket base URLs.
     """
-    # if not server_ip or not str(server_ip).strip():
-    #     server_ip = "127.0.0.1"
-    server_ip = "10.51.49.251"
+    if not server_ip or not str(server_ip).strip():
+        server_ip = DEFAULT_SERVER_IP
     raw = str(server_ip).strip()
 
     if raw.startswith("http://") or raw.startswith("https://"):
@@ -74,7 +77,7 @@ class CountRateWorker(QThread):
     """
     newDataReady = pyqtSignal(np.ndarray)
 
-    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token="", is_mock=False, server_ip="127.0.0.1"):
+    def __init__(self, channels, user_name="maas-gui-client", binwidth=int(1e9), n_values=1000, refresh_rate=25, mode="Free Running", auth_token="", is_mock=False, server_ip=DEFAULT_SERVER_IP):
         super().__init__()
         self.channels = channels
         self.running = True
