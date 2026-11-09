@@ -108,3 +108,86 @@ def test_main_window_fetch_booked_channels(qtbot, mocker):
     window.fetch_booked_channels()
     
     assert window.channel_nodes[1].full_user_name == "bob"
+
+
+def _mock_login(mocker, token="login-token"):
+    login = mocker.patch("requests.post")
+    resp = mocker.Mock()
+    resp.status_code = 200
+    resp.json.return_value = {"token": token}
+    login.return_value = resp
+    return login
+
+
+def test_channels_not_fetched_before_login(qtbot, mocker):
+    """Before login there is no auth token, so the GUI must not query MaaS for channels."""
+    mock_get = mocker.patch("requests.Session.get")
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    channel_calls = [c for c in mock_get.call_args_list if "/channels" in str(c.args[0])]
+    assert channel_calls == []
+
+
+def test_login_fetches_channel_bookings(qtbot, mocker):
+    """Logging in loads the current bookings from MaaS, using the new auth token."""
+    window = MainWindow()
+    qtbot.addWidget(window)
+    _mock_login(mocker, token="login-token")
+
+    seen_auth = []
+    resp = mocker.Mock()
+    resp.status_code = 200
+    resp.json.return_value = {"channels": [
+        {"channel_number": 2, "status": "booked", "user_name": "alice"},
+        {"channel_number": 5, "status": "booked", "user_name": "bob"},
+        {"channel_number": 7, "status": "available", "user_name": None},
+    ]}
+
+    def fake_get(url, **kwargs):
+        seen_auth.append(window.session.headers.get("Authorization"))
+        return resp
+
+    mock_get = mocker.patch.object(window.session, "get", side_effect=fake_get)
+
+    window.login_username_input.setText("alice")
+    window.login_password_input.setText("secret")
+    window.authenticate()
+
+    mock_get.assert_called_once_with(f"{window.api_url}/channels", timeout=2)
+    assert seen_auth == ["Bearer login-token"]
+    assert window.channel_nodes[2].node.booked_by == "alice"
+    assert window.channel_nodes[2].node.is_current_user
+    assert window.channel_nodes[5].node.booked_by == "bob"
+    assert not window.channel_nodes[5].node.is_current_user
+    assert window.channel_nodes[7].node.booked_by is None
+
+
+def test_failed_channel_fetch_after_login_is_handled(qtbot, mocker):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    _mock_login(mocker)
+    resp = mocker.Mock()
+    resp.status_code = 401
+    resp.text = "Unauthorized"
+    mocker.patch.object(window.session, "get", return_value=resp)
+
+    window.login_username_input.setText("alice")
+    window.login_password_input.setText("secret")
+    window.authenticate()
+
+    assert window.stacked_widget.currentWidget() is window.main_app_widget
+    assert all(c.node.booked_by is None for c in window.channel_nodes.values())
+
+
+def test_testing_mode_login_does_not_fetch_channels(qtbot, mocker):
+    window = MainWindow(force_mock=True)
+    qtbot.addWidget(window)
+    mock_get = mocker.patch.object(window.session, "get")
+
+    window.login_username_input.setText("alice")
+    window.login_password_input.setText("secret")
+    window.authenticate()
+
+    mock_get.assert_not_called()

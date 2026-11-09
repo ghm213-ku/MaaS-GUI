@@ -930,6 +930,9 @@ class MainWindow(QMainWindow):
         self.user_name_input.setText(self.login_username)
         self.user_name_input.setReadOnly(True)
         self.user_name_input.setStyleSheet("padding: 4px; border: 1px solid #ccc; border-radius: 4px; background-color: #f0f0f0; color: #555;")
+
+        # Load the current channel bookings from MaaS so the home page shows them right away
+        self.fetch_booked_channels()
         
         # Switch to main app
         self.stacked_widget.setCurrentWidget(self.main_app_widget)
@@ -1201,8 +1204,8 @@ class MainWindow(QMainWindow):
         grid_scroll.setWidgetResizable(True)
         
         layout.addWidget(grid_scroll)
-        
-        self.fetch_booked_channels()
+        # Channel bookings are fetched after login (see authenticate), once the
+        # auth token and server address are known.
 
     def fetch_booked_channels(self):
         if getattr(self, 'force_mock', False):
@@ -1224,6 +1227,8 @@ class MainWindow(QMainWindow):
                     if status == "booked" and ch_num in self.channel_nodes:
                         is_current = (user_name == current_user)
                         self.channel_nodes[ch_num].set_booked_by(user_name, is_current)
+            else:
+                logger.error(f"Failed to fetch booked channels: {resp.status_code} {resp.text}")
         except Exception as e:
             logger.error(f"Failed to fetch booked channels: {e}")
 
