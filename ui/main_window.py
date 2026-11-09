@@ -2355,17 +2355,18 @@ class MainWindow(QMainWindow):
         self.hist_filter_plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self.hist_filter_plot_widget.setLabel('bottom', 'Time (s)')
         self.hist_filter_plot_widget.setLabel('left', 'Sum in Filter')
-        self.hist_filter_plot_widget.hide()
         self.hist_filter_curve = self.hist_filter_plot_widget.plot(pen='y')
-        
+
         self.hist_filter_ydata = []
         self.hist_filter_xdata = []
-        
+        self.hist_filter_container = self._build_hist_filter_panel('hist')
+        self.hist_filter_container.hide()
+
         layout.addWidget(self.hist_plot_widget)
-        layout.addWidget(self.hist_filter_plot_widget)
-        
+        layout.addWidget(self.hist_filter_container)
+
         layout.setStretchFactor(self.hist_plot_widget, 3)
-        layout.setStretchFactor(self.hist_filter_plot_widget, 1)
+        layout.setStretchFactor(self.hist_filter_container, 1)
         
         self.hist_worker = None
         
@@ -2489,22 +2490,116 @@ class MainWindow(QMainWindow):
         self.hist2_filter_plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self.hist2_filter_plot_widget.setLabel('bottom', 'Time (s)')
         self.hist2_filter_plot_widget.setLabel('left', 'Sum in Filter')
-        self.hist2_filter_plot_widget.hide()
         self.hist2_filter_curve = self.hist2_filter_plot_widget.plot(pen='y')
-        
+
         self.hist2_filter_ydata = []
         self.hist2_filter_xdata = []
-        
+        self.hist2_filter_container = self._build_hist_filter_panel('hist2')
+        self.hist2_filter_container.hide()
+
         layout.addWidget(self.hist2_plot_widget)
-        layout.addWidget(self.hist2_filter_plot_widget)
-        
+        layout.addWidget(self.hist2_filter_container)
+
         layout.setStretchFactor(self.hist2_plot_widget, 3)
-        layout.setStretchFactor(self.hist2_filter_plot_widget, 1)
+        layout.setStretchFactor(self.hist2_filter_container, 1)
         
         self.hist2_worker = None
         
         # Initialize UI state based on default mode
         self.on_hist_mode_changed_2()
+
+    def _build_hist_filter_panel(self, prefix):
+        """Wrap the '<prefix>_filter_plot_widget' with its own zoom / auto-range / save controls."""
+        plot = getattr(self, f'{prefix}_filter_plot_widget')
+
+        btn_zoom = QPushButton("⌕")
+        btn_zoom.setStyleSheet("font-size: 18px; font-weight: bold;")
+        btn_zoom.setCheckable(True)
+        btn_zoom.setToolTip("Toggle Zoom Mode")
+        btn_zoom.clicked.connect(lambda checked: self._hist_filter_toggle_zoom(prefix, checked))
+
+        btn_auto = QPushButton("⤢")
+        btn_auto.setStyleSheet("font-size: 18px; font-weight: bold;")
+        btn_auto.setToolTip("Enable Auto Range (follow latest data)")
+        btn_auto.clicked.connect(lambda: self._hist_filter_auto_range(prefix))
+
+        btn_export = QPushButton()
+        btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
+        btn_export.setToolTip("Export Filter Data")
+        btn_export.clicked.connect(lambda: self._hist_filter_export(prefix))
+
+        setattr(self, f'{prefix}_filter_btn_zoom', btn_zoom)
+        setattr(self, f'{prefix}_filter_btn_auto_range', btn_auto)
+        setattr(self, f'{prefix}_filter_btn_export', btn_export)
+
+        # While following, the x-axis scrolls with the newest point. Any manual
+        # zoom/pan stops following until auto range is pressed again.
+        setattr(self, f'{prefix}_filter_follow', True)
+        plot.getViewBox().sigRangeChangedManually.connect(
+            lambda *_: setattr(self, f'{prefix}_filter_follow', False))
+
+        controls = QHBoxLayout()
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.addWidget(btn_zoom)
+        controls.addWidget(btn_auto)
+        controls.addWidget(btn_export)
+        controls.addStretch()
+
+        container = QWidget()
+        vbox = QVBoxLayout(container)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.addLayout(controls)
+        vbox.addWidget(plot)
+        return container
+
+    def _hist_filter_toggle_zoom(self, prefix, checked):
+        vb = getattr(self, f'{prefix}_filter_plot_widget').getViewBox()
+        vb.setMouseMode(pg.ViewBox.RectMode if checked else pg.ViewBox.PanMode)
+
+    def _hist_filter_auto_range(self, prefix):
+        setattr(self, f'{prefix}_filter_follow', True)
+        getattr(self, f'{prefix}_filter_plot_widget').enableAutoRange()
+
+    def _hist_filter_reset(self, prefix):
+        """Clear the filter-sum trace so it restarts together with the main histogram."""
+        import time
+        setattr(self, f'{prefix}_filter_xdata', [])
+        setattr(self, f'{prefix}_filter_ydata', [])
+        getattr(self, f'{prefix}_filter_curve').setData([], [])
+        if hasattr(self, f'{prefix}_filter_ydata_2'):
+            setattr(self, f'{prefix}_filter_ydata_2', [])
+        if hasattr(self, f'{prefix}_filter_curve_2'):
+            getattr(self, f'{prefix}_filter_curve_2').setData([], [])
+        setattr(self, f'{prefix}_filter_start_time', time.time())
+        self._hist_filter_auto_range(prefix)
+
+    def _hist_filter_export(self, prefix):
+        xdata = getattr(self, f'{prefix}_filter_xdata', [])
+        if not xdata:
+            QMessageBox.warning(self, "No Data", "There is no filter data to export.")
+            return
+
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Filter Data", "", "NumPy Files (*.npy);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        try:
+            # Columns: elapsed time (s), sum in filter 1[, sum in filter 2]
+            columns = [np.asarray(xdata), np.asarray(getattr(self, f'{prefix}_filter_ydata'))]
+            ydata_2 = getattr(self, f'{prefix}_filter_ydata_2', None)
+            if ydata_2 and len(ydata_2) == len(xdata):
+                columns.append(np.asarray(ydata_2))
+            np.save(file_path, np.column_stack(columns))
+
+            final_path = file_path if file_path.endswith('.npy') else file_path + '.npy'
+            logger.info(f"Exported filter data successfully to {final_path}")
+            QMessageBox.information(self, "Export Successful", f"Data successfully saved to:\n{final_path}")
+        except Exception as e:
+            logger.error(f"Export Failed: {e}")
+            QMessageBox.critical(self, "Export Failed", f"An error occurred while saving:\n{e}")
 
     def update_histogram_channel_dropdowns(self):
         channels = self.get_selected_channels()
@@ -3045,11 +3140,11 @@ class MainWindow(QMainWindow):
             self.hist2_plot_widget.clear()
             self.hist2_plot_curve = self.hist2_plot_widget.plot(pen='b')
             self.hist2_plot_widget.addItem(self.hist2_region)
-            if hasattr(self, 'hist_region_2'):
+            if hasattr(self, 'hist2_region_2'):
                 self.hist2_plot_widget.addItem(self.hist2_region_2)
             if not self.hist2_btn_filter.isChecked():
                 self.hist2_region.hide()
-                if hasattr(self, 'hist_region_2'):
+                if hasattr(self, 'hist2_region_2'):
                     self.hist2_region_2.hide()
             self.hist2_data_buffer = np.zeros(n_values)
             self.hist2_x_buffer = np.zeros(n_values)
@@ -3172,12 +3267,12 @@ class MainWindow(QMainWindow):
                 self.hist_filter_curve_2.setData([], [])
 
     def toggle_second_filter_2(self):
-        if not getattr(self, 'second_filter_active', False):
-            self.second_filter_active = True
+        if not getattr(self, 'hist2_second_filter_active', False):
+            self.hist2_second_filter_active = True
             self.hist2_btn_add_filter.setText("-")
             self.hist2_btn_add_filter.setToolTip("Remove second filter")
             
-            if not hasattr(self, 'hist_region_2'):
+            if not hasattr(self, 'hist2_region_2'):
                 self.hist2_region_2 = pg.LinearRegionItem(brush=(0, 255, 255, 50))
                 self.hist2_region_2.setZValue(10)
                 self.hist2_plot_widget.addItem(self.hist2_region_2)
@@ -3185,20 +3280,20 @@ class MainWindow(QMainWindow):
                 
             self.hist2_region_2.show()
             
-            if hasattr(self, 'hist_x_buffer') and len(self.hist2_x_buffer) > 0:
+            if hasattr(self, 'hist2_x_buffer') and len(self.hist2_x_buffer) > 0:
                 mid = len(self.hist2_x_buffer) // 2
                 span = (self.hist2_x_buffer[-1] - self.hist2_x_buffer[0]) * 0.1
                 if span == 0: span = 1
                 self.hist2_region_2.setRegion([self.hist2_x_buffer[mid], self.hist2_x_buffer[mid] + span*2])
                 
             self.hist2_filter_ydata_2 = []
-            if hasattr(self, 'hist_filter_ydata') and len(self.hist2_filter_ydata) > 0:
+            if hasattr(self, 'hist2_filter_ydata') and len(self.hist2_filter_ydata) > 0:
                 self.hist2_filter_ydata_2 = [0] * len(self.hist2_filter_ydata)
         else:
-            self.second_filter_active = False
+            self.hist2_second_filter_active = False
             self.hist2_btn_add_filter.setText("+")
             self.hist2_btn_add_filter.setToolTip("Add second filter")
-            if hasattr(self, 'hist_region_2'):
+            if hasattr(self, 'hist2_region_2'):
                 self.hist2_region_2.hide()
                 self.hist2_filter_curve_2.setData([], [])
 
@@ -3261,7 +3356,7 @@ class MainWindow(QMainWindow):
         menu.exec(self.hist_btn_filter.mapToGlobal(pos))
 
     def show_filter_context_menu_2(self, pos):
-        if not hasattr(self, 'hist_btn_filter') or not self.hist2_btn_filter.isChecked():
+        if not hasattr(self, 'hist2_btn_filter') or not self.hist2_btn_filter.isChecked():
             return
             
         menu = QMenu(self)
@@ -3293,7 +3388,7 @@ class MainWindow(QMainWindow):
         row1, min1, max1 = create_row("F1 (Yellow):", self.hist2_region)
         layout.addLayout(row1)
         
-        has_f2 = getattr(self, 'second_filter_active', False)
+        has_f2 = getattr(self, 'hist2_second_filter_active', False)
         if has_f2:
             row2, min2, max2 = create_row("F2 (Cyan):", self.hist2_region_2)
             layout.addLayout(row2)
@@ -3321,7 +3416,7 @@ class MainWindow(QMainWindow):
     def toggle_hist_filter(self):
         if self.hist_btn_filter.isChecked():
             self.hist_region.show()
-            self.hist_filter_plot_widget.show()
+            self.hist_filter_container.show()
             self.hist_btn_add_filter.show()
             if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_region_2'):
                 self.hist_region_2.show()
@@ -3345,7 +3440,7 @@ class MainWindow(QMainWindow):
                 self.hist_region_needs_init = True
         else:
             self.hist_region.hide()
-            self.hist_filter_plot_widget.hide()
+            self.hist_filter_container.hide()
             self.hist_btn_add_filter.hide()
             if hasattr(self, 'hist_region_2'):
                 self.hist_region_2.hide()
@@ -3353,22 +3448,22 @@ class MainWindow(QMainWindow):
     def toggle_hist_filter_2(self):
         if self.hist2_btn_filter.isChecked():
             self.hist2_region.show()
-            self.hist2_filter_plot_widget.show()
+            self.hist2_filter_container.show()
             self.hist2_btn_add_filter.show()
-            if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_region_2'):
+            if getattr(self, 'hist2_second_filter_active', False) and hasattr(self, 'hist2_region_2'):
                 self.hist2_region_2.show()
             self.hist2_filter_ydata = []
-            if getattr(self, 'second_filter_active', False):
+            if getattr(self, 'hist2_second_filter_active', False):
                 self.hist2_filter_ydata_2 = []
             self.hist2_filter_xdata = []
             self.hist2_filter_curve.setData([], [])
-            if hasattr(self, 'hist_filter_curve_2'):
+            if hasattr(self, 'hist2_filter_curve_2'):
                 self.hist2_filter_curve_2.setData([], [])
             
             import time
             self.hist2_filter_start_time = time.time()
             
-            if hasattr(self, 'hist_x_buffer') and self.hist2_x_buffer is not None and len(self.hist2_x_buffer) > 0:
+            if hasattr(self, 'hist2_x_buffer') and self.hist2_x_buffer is not None and len(self.hist2_x_buffer) > 0:
                 mid = len(self.hist2_x_buffer) // 2
                 span = (self.hist2_x_buffer[-1] - self.hist2_x_buffer[0]) * 0.1
                 if span == 0: span = 1
@@ -3377,9 +3472,9 @@ class MainWindow(QMainWindow):
                 self.hist2_region_needs_init = True
         else:
             self.hist2_region.hide()
-            self.hist2_filter_plot_widget.hide()
+            self.hist2_filter_container.hide()
             self.hist2_btn_add_filter.hide()
-            if hasattr(self, 'hist_region_2'):
+            if hasattr(self, 'hist2_region_2'):
                 self.hist2_region_2.hide()
 
     def update_histogram_plot(self, x_data, y_data):
@@ -3440,10 +3535,11 @@ class MainWindow(QMainWindow):
                         if current_window < 1 or current_window > 100000:
                             current_window = 60
                             
-                        if elapsed > current_window:
-                            self.hist_filter_plot_widget.setXRange(elapsed - current_window, elapsed, padding=0)
-                        else:
-                            self.hist_filter_plot_widget.setXRange(0, current_window, padding=0)
+                        if getattr(self, 'hist_filter_follow', True):
+                            if elapsed > current_window:
+                                self.hist_filter_plot_widget.setXRange(elapsed - current_window, elapsed, padding=0)
+                            else:
+                                self.hist_filter_plot_widget.setXRange(0, current_window, padding=0)
                             
                         self.hist_filter_curve.setData(self.hist_filter_xdata, self.hist_filter_ydata)
                         if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_curve_2') and hasattr(self, 'hist_filter_ydata_2'):
@@ -3457,50 +3553,50 @@ class MainWindow(QMainWindow):
                 binwidth_ps = float(self.hist2_binwidth_input.text())
                 
                 self.hist2_data_buffer = y_data.flatten()
-                self.hist_x_buffer = x_data.flatten() * 1e-12
+                self.hist2_x_buffer = x_data.flatten() * 1e-12
                 
                 mode = self.hist2_mode_combo.currentText()
-                if mode == "Correlation" and len(self.hist_x_buffer) > 0 and self.hist_x_buffer[0] >= 0:
-                    self.hist_x_buffer = self.hist_x_buffer - (len(self.hist_x_buffer) * (binwidth_ps * 1e-12) / 2)
+                if mode == "Correlation" and len(self.hist2_x_buffer) > 0 and self.hist2_x_buffer[0] >= 0:
+                    self.hist2_x_buffer = self.hist2_x_buffer - (len(self.hist2_x_buffer) * (binwidth_ps * 1e-12) / 2)
                 
                 # Check for empty arrays to prevent pyqtgraph crashes
-                if len(self.hist_x_buffer) == 0 or len(self.hist2_data_buffer) == 0:
+                if len(self.hist2_x_buffer) == 0 or len(self.hist2_data_buffer) == 0:
                     self.hist2_plot_curve.setData([], [])
                 else:
-                    self.hist2_plot_curve.setData(self.hist_x_buffer, self.hist2_data_buffer)
+                    self.hist2_plot_curve.setData(self.hist2_x_buffer, self.hist2_data_buffer)
                     
-                    if hasattr(self, 'hist_btn_filter') and self.hist2_btn_filter.isChecked():
-                        if getattr(self, 'hist_region_needs_init', False) and len(self.hist_x_buffer) > 0:
-                            mid = len(self.hist_x_buffer) // 2
-                            span = (self.hist_x_buffer[-1] - self.hist_x_buffer[0]) * 0.1
+                    if hasattr(self, 'hist2_btn_filter') and self.hist2_btn_filter.isChecked():
+                        if getattr(self, 'hist2_region_needs_init', False) and len(self.hist2_x_buffer) > 0:
+                            mid = len(self.hist2_x_buffer) // 2
+                            span = (self.hist2_x_buffer[-1] - self.hist2_x_buffer[0]) * 0.1
                             if span == 0: span = 1
-                            self.hist2_region.setRegion([self.hist_x_buffer[mid] - span, self.hist_x_buffer[mid] + span])
+                            self.hist2_region.setRegion([self.hist2_x_buffer[mid] - span, self.hist2_x_buffer[mid] + span])
                             self.hist2_region_needs_init = False
                             
                         minX, maxX = self.hist2_region.getRegion()
-                        mask = (self.hist_x_buffer >= minX) & (self.hist_x_buffer <= maxX)
+                        mask = (self.hist2_x_buffer >= minX) & (self.hist2_x_buffer <= maxX)
                         sum_val = np.sum(self.hist2_data_buffer[mask])
                         
                         sum_val_2 = 0
-                        if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_region_2'):
+                        if getattr(self, 'hist2_second_filter_active', False) and hasattr(self, 'hist2_region_2'):
                             minX_2, maxX_2 = self.hist2_region_2.getRegion()
-                            mask_2 = (self.hist_x_buffer >= minX_2) & (self.hist_x_buffer <= maxX_2)
+                            mask_2 = (self.hist2_x_buffer >= minX_2) & (self.hist2_x_buffer <= maxX_2)
                             sum_val_2 = np.sum(self.hist2_data_buffer[mask_2])
                         
                         import time
-                        if not hasattr(self, 'hist_filter_start_time'):
+                        if not hasattr(self, 'hist2_filter_start_time'):
                             self.hist2_filter_start_time = time.time()
                             
                         elapsed = time.time() - self.hist2_filter_start_time
                         
                         self.hist2_filter_ydata.append(sum_val)
-                        if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_ydata_2'):
+                        if getattr(self, 'hist2_second_filter_active', False) and hasattr(self, 'hist2_filter_ydata_2'):
                             self.hist2_filter_ydata_2.append(sum_val_2)
                         self.hist2_filter_xdata.append(elapsed)
                         
                         if len(self.hist2_filter_ydata) > 10000:
                             self.hist2_filter_ydata = self.hist2_filter_ydata[-10000:]
-                            if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_ydata_2'):
+                            if getattr(self, 'hist2_second_filter_active', False) and hasattr(self, 'hist2_filter_ydata_2'):
                                 self.hist2_filter_ydata_2 = self.hist2_filter_ydata_2[-10000:]
                             self.hist2_filter_xdata = self.hist2_filter_xdata[-10000:]
                             
@@ -3509,13 +3605,14 @@ class MainWindow(QMainWindow):
                         if current_window < 1 or current_window > 100000:
                             current_window = 60
                             
-                        if elapsed > current_window:
-                            self.hist2_filter_plot_widget.setXRange(elapsed - current_window, elapsed, padding=0)
-                        else:
-                            self.hist2_filter_plot_widget.setXRange(0, current_window, padding=0)
+                        if getattr(self, 'hist2_filter_follow', True):
+                            if elapsed > current_window:
+                                self.hist2_filter_plot_widget.setXRange(elapsed - current_window, elapsed, padding=0)
+                            else:
+                                self.hist2_filter_plot_widget.setXRange(0, current_window, padding=0)
                             
                         self.hist2_filter_curve.setData(self.hist2_filter_xdata, self.hist2_filter_ydata)
-                        if getattr(self, 'second_filter_active', False) and hasattr(self, 'hist_filter_curve_2') and hasattr(self, 'hist_filter_ydata_2'):
+                        if getattr(self, 'hist2_second_filter_active', False) and hasattr(self, 'hist2_filter_curve_2') and hasattr(self, 'hist2_filter_ydata_2'):
                             self.hist2_filter_curve_2.setData(self.hist2_filter_xdata, self.hist2_filter_ydata_2)
             except Exception as e:
                 logger.error(f"Error plotting histogram: {e}")
@@ -3607,7 +3704,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'lbl_hist_bins'):
                 self.lbl_hist_bins.setEnabled(True)
                 
-        if hasattr(self, 'hist_btn_filter'):
+        if hasattr(self, 'hist2_btn_filter'):
             self.hist2_btn_filter.show()
 
     def quick_restart_histogram(self):
@@ -3672,6 +3769,7 @@ class MainWindow(QMainWindow):
         self.hist_plot_curve = None
         self.hist_data_buffer = None
         self.hist_x_buffer = None
+        self._hist_filter_reset('hist')
         
         self.hist_btn_play_pause.setEnabled(True)
         self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
@@ -3695,15 +3793,16 @@ class MainWindow(QMainWindow):
             
         self.hist2_plot_widget.clear()
         self.hist2_plot_widget.addItem(self.hist2_region)
-        if hasattr(self, 'hist_region_2'):
+        if hasattr(self, 'hist2_region_2'):
             self.hist2_plot_widget.addItem(self.hist2_region_2)
         if not self.hist2_btn_filter.isChecked():
             self.hist2_region.hide()
-            if hasattr(self, 'hist_region_2'):
+            if hasattr(self, 'hist2_region_2'):
                 self.hist2_region_2.hide()
         self.hist2_plot_curve = None
         self.hist2_data_buffer = None
         self.hist2_x_buffer = None
+        self._hist_filter_reset('hist2')
         
         self.hist2_btn_play_pause.setEnabled(True)
         self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
