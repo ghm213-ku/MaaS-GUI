@@ -1916,7 +1916,7 @@ class MainWindow(QMainWindow):
 
     def stop_coincidences_measurement(self):
         if self.coinc_worker:
-            self.coinc_worker.stop()
+            self._retire_worker(self.coinc_worker)
             self.coinc_worker = None
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
@@ -1927,8 +1927,7 @@ class MainWindow(QMainWindow):
 
     def reset_coincidences_measurement(self):
         if self.coinc_worker:
-            self.coinc_worker.stop()
-            self.old_workers.append(self.coinc_worker)
+            self._retire_worker(self.coinc_worker)
             self.coinc_worker = None
             
         self.coinc_ydata = []
@@ -2530,15 +2529,14 @@ class MainWindow(QMainWindow):
             return
             
         if self.worker:
-            self.worker.stop()
-            self.old_workers.append(self.worker)
+            self._retire_worker(self.worker)
             self.worker = None
             
         self.start_measurement()
 
     def on_worker_finished(self):
         # Restore UI when Single measurement completes naturally
-        if self.worker is None:
+        if self.worker is None or self._is_stale_worker_signal(self.worker):
             return
             
         logger.info("Worker thread finished naturally. Restoring UI state.")
@@ -2604,7 +2602,7 @@ class MainWindow(QMainWindow):
 
     def stop_measurement(self):
         if self.worker:
-            self.worker.stop()
+            self._retire_worker(self.worker)
             self.worker = None
         from PyQt6.QtWidgets import QStyle
         self.btn_play_pause.setEnabled(True)
@@ -2623,8 +2621,7 @@ class MainWindow(QMainWindow):
 
     def reset_measurement(self):
         if self.worker:
-            self.worker.stop()
-            self.old_workers.append(self.worker)
+            self._retire_worker(self.worker)
             self.worker = None
             
         self.plot_widget.clear()
@@ -3307,13 +3304,13 @@ class MainWindow(QMainWindow):
 
     def quick_restart_histogram_2(self):
         if self.hist2_worker:
-            self.reset_histogram_measurement()
+            self.reset_histogram_measurement_2()
             self.start_histogram_measurement_2()
 
 
     def stop_histogram_measurement(self):
         if self.hist_worker:
-            self.hist_worker.stop()
+            self._retire_worker(self.hist_worker)
             self.hist_worker = None
         from PyQt6.QtWidgets import QStyle
         self.hist_btn_play_pause.setEnabled(True)
@@ -3330,7 +3327,7 @@ class MainWindow(QMainWindow):
 
     def stop_histogram_measurement_2(self):
         if self.hist2_worker:
-            self.hist2_worker.stop()
+            self._retire_worker(self.hist2_worker)
             self.hist2_worker = None
         from PyQt6.QtWidgets import QStyle
         self.hist2_btn_play_pause.setEnabled(True)
@@ -3347,8 +3344,7 @@ class MainWindow(QMainWindow):
 
     def reset_histogram_measurement(self):
         if self.hist_worker:
-            self.hist_worker.stop()
-            self.old_workers.append(self.hist_worker)
+            self._retire_worker(self.hist_worker)
             self.hist_worker = None
             
         self.hist_plot_widget.clear()
@@ -3380,8 +3376,7 @@ class MainWindow(QMainWindow):
 
     def reset_histogram_measurement_2(self):
         if self.hist2_worker:
-            self.hist2_worker.stop()
-            self.old_workers.append(self.hist2_worker)
+            self._retire_worker(self.hist2_worker)
             self.hist2_worker = None
             
         self.hist2_plot_widget.clear()
@@ -3412,6 +3407,8 @@ class MainWindow(QMainWindow):
         self.set_other_tabs_enabled(True, 3)
 
     def on_histogram_worker_finished(self):
+        if self._is_stale_worker_signal(self.hist_worker):
+            return
         self.hist_btn_play_pause.setEnabled(True)
         self.hist_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.hist_btn_play_pause.setToolTip("Start")
@@ -3428,6 +3425,8 @@ class MainWindow(QMainWindow):
         self.hist_worker = None
 
     def on_histogram_worker_finished_2(self):
+        if self._is_stale_worker_signal(self.hist2_worker):
+            return
         self.hist2_btn_play_pause.setEnabled(True)
         self.hist2_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.hist2_btn_play_pause.setToolTip("Start")
@@ -3521,18 +3520,66 @@ class MainWindow(QMainWindow):
             logger.error(f"Export Failed: {e}")
             QMessageBox.critical(self, "Export Failed", f"An error occurred while saving:\n{e}")
 
+    def _retire_worker(self, worker):
+        """Stop a measurement worker without letting its QThread be destroyed.
+
+        Stopping only asks the thread to exit; it still runs its teardown
+        (closing the websocket and deleting the measurement on the backend,
+        which can take several seconds). Dropping the last Python reference
+        before then destroys a running QThread and Qt aborts the process
+        ("QThread: Destroyed while thread is still running"). Keep the worker
+        in ``old_workers`` until its thread has really finished.
+        """
+        if worker is None:
+            return
+        try:
+            worker.stop()
+        except Exception:
+            logger.exception("Error while stopping worker %r", worker)
+        if worker not in self.old_workers:
+            self.old_workers.append(worker)
+        worker.finished.connect(lambda w=worker: self._release_worker(w))
+        if not worker.isRunning():
+            self._release_worker(worker)
+
+    def _release_worker(self, worker):
+        """Drop a retired worker once its thread has finished."""
+        if worker.isRunning():
+            # finished is emitted just before the thread fully exits.
+            worker.wait(2000)
+            if worker.isRunning():
+                return
+        try:
+            self.old_workers.remove(worker)
+        except ValueError:
+            pass
+
+    def _is_stale_worker_signal(self, current_worker):
+        """True when a signal comes from a worker that is no longer current."""
+        sender = self.sender()
+        return sender is not None and sender is not current_worker
+
     def closeEvent(self, event):
         logger.info("Application is closing. Tearing down hardware and measurements...")
         self.health_timer.stop()
         
-        if hasattr(self, 'old_workers'):
-            for old_worker in self.old_workers:
-                old_worker.force_teardown()
-                    
-        if self.worker:
-            self.worker.force_teardown()
-            
-        if hasattr(self, 'hist_worker') and self.hist_worker:
-            self.hist_worker.force_teardown()
-            
+        workers = list(getattr(self, 'old_workers', []))
+        for attr in ('worker', 'hist_worker', 'hist2_worker', 'coinc_worker'):
+            w = getattr(self, attr, None)
+            if w is not None and w not in workers:
+                workers.append(w)
+
+        for w in workers:
+            try:
+                w.force_teardown()
+            except Exception:
+                logger.exception("Error tearing down worker %r on close", w)
+        # Let every thread exit before the QThread objects are destroyed.
+        for w in workers:
+            try:
+                if w.isRunning() and not w.wait(5000):
+                    logger.warning("Worker %r still running at shutdown", w)
+            except Exception:
+                logger.exception("Error waiting for worker %r on close", w)
+
         event.accept()

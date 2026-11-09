@@ -13,7 +13,73 @@ os.environ.setdefault(
 
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QPen, QPalette
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
+
+LOG_FILE = "maas_gui.log"
+
+
+def install_crash_logging(log_file=LOG_FILE):
+    """Route every error we can catch into the log, with tracebacks.
+
+    - Uncaught Python exceptions (main thread, Qt slots, worker threads) are
+      logged with their full traceback instead of silently killing the app.
+    - Qt's own warnings/fatal messages (e.g. "QThread: Destroyed while thread
+      is still running") go through the logger.
+    - faulthandler dumps the Python stack of every thread to the log if the
+      process dies from a native crash (abort, segfault).
+    """
+    import faulthandler
+    import threading
+
+    log = logging.getLogger("crash")
+
+    def excepthook(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        log.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+
+    def thread_excepthook(args):
+        log.critical(
+            "Uncaught exception in thread %s",
+            getattr(args.thread, "name", "?"),
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+        )
+
+    sys.excepthook = excepthook
+    threading.excepthook = thread_excepthook
+
+    qt_levels = {
+        QtMsgType.QtDebugMsg: logging.DEBUG,
+        QtMsgType.QtInfoMsg: logging.INFO,
+        QtMsgType.QtWarningMsg: logging.WARNING,
+        QtMsgType.QtCriticalMsg: logging.ERROR,
+        QtMsgType.QtFatalMsg: logging.CRITICAL,
+    }
+    qt_log = logging.getLogger("qt")
+
+    def qt_message_handler(msg_type, context, message):
+        level = qt_levels.get(msg_type, logging.WARNING)
+        where = ""
+        if context is not None and context.file:
+            where = f" ({context.file}:{context.line}, {context.function})"
+        qt_log.log(level, "%s%s", message, where)
+        if msg_type == QtMsgType.QtFatalMsg:
+            # Qt aborts right after this; make sure the stacks are on disk.
+            for handler in logging.getLogger().handlers:
+                handler.flush()
+            faulthandler.dump_traceback(file=_fault_file, all_threads=True)
+
+    qInstallMessageHandler(qt_message_handler)
+
+    # Keep the file open for the life of the process: faulthandler writes to
+    # its file descriptor directly when the interpreter is crashing.
+    global _fault_file
+    _fault_file = open(log_file, "a", buffering=1, encoding="utf-8")
+    faulthandler.enable(file=_fault_file, all_threads=True)
+
+
+_fault_file = None
 
 if __name__ == '__main__':
     # Setup robust logging for the entire application
@@ -21,11 +87,12 @@ if __name__ == '__main__':
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
-            logging.FileHandler("maas_gui.log", mode='a'),
+            logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8'),
             logging.StreamHandler(sys.stdout)
         ]
     )
     logger = logging.getLogger(__name__)
+    install_crash_logging()
     logger.info("Starting MaaS GUI Application")
     
     app = QApplication(sys.argv)
