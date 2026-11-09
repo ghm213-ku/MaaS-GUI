@@ -103,3 +103,15 @@ def fake_workers(mocker):
     classes from the ``hardware`` package directly.
     """
     return FakeWorkers(mocker)
+
+
+@pytest.fixture(autouse=True)
+def fake_health_checks(mocker):
+    """The home page MaaS health check normally runs on a QThreadPool thread.
+
+    Tests never start that thread: ``MainWindow._start_health_check`` is replaced
+    by a mock recording the server URLs it was asked to check. Tests deliver a
+    result themselves by calling ``window.on_maas_health_result(...)``.
+    """
+    from ui.main_window import MainWindow
+    return mocker.patch.object(MainWindow, "_start_health_check", autospec=True)
