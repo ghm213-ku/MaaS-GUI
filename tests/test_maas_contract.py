@@ -69,6 +69,59 @@ def test_correlation_sends_click_as_channel1_and_start_as_channel2(mocker):
     assert payload["metadata"]["channel2"] == 1  # start
 
 
+# ---------- histogram stream size ----------
+
+@pytest.mark.parametrize("n_values, expected_hz", [
+    (10, 25), (1000, 25), (10_000, 10), (65_536, 1), (1_000_000, 1),
+])
+def test_histogram_refresh_rate_shrinks_with_bins(mocker, n_values, expected_hz):
+    """Large histograms request fewer frames so the stream stays within budget."""
+    worker = HistogramWorker(1, 2, "testuser", 100, n_values, "Histogram")
+    payload, _ = run_worker(mocker, worker, [])
+    assert payload["metadata"]["refresh_rate"] == expected_hz
+
+
+def test_histogram_stall_is_reported_once(mocker):
+    import itertools
+    import websocket
+    worker = HistogramWorker(1, 2, "testuser", 100, 10, "Histogram")
+    clock = itertools.count(0, 10)  # each read of the clock is 10 s later
+    mocker.patch("time.monotonic", side_effect=lambda: next(clock))
+    problems = []
+    worker.streamProblem.connect(problems.append)
+
+    mocker.patch("requests.Session.post").return_value.json.return_value = {"measurement_id": "mid"}
+    ws = Mock()
+    mocker.patch("websocket.WebSocket", return_value=ws)
+    calls = iter(range(10))
+
+    def recv():
+        if next(calls) == 4:
+            worker.running = False
+        raise websocket.WebSocketTimeoutException()
+
+    ws.recv.side_effect = recv
+    mocker.patch.object(worker, "_perform_teardown")
+    worker.run()
+
+    assert len(problems) == 1
+    assert "No histogram data" in problems[0]
+
+
+def test_histogram_server_close_is_reported(mocker):
+    import websocket
+    worker = HistogramWorker(1, 2, "testuser", 100, 10, "Histogram")
+    problems = []
+    worker.streamProblem.connect(problems.append)
+    mocker.patch("requests.Session.post").return_value.json.return_value = {"measurement_id": "mid"}
+    ws = Mock()
+    mocker.patch("websocket.WebSocket", return_value=ws)
+    ws.recv.side_effect = websocket.WebSocketConnectionClosedException()
+    mocker.patch.object(worker, "_perform_teardown")
+    worker.run()
+    assert problems == ["MaaS closed the histogram data stream."]
+
+
 # ---------- Single mode ----------
 
 def test_count_rate_single_sends_duration_and_stops_on_final_frame(mocker):
