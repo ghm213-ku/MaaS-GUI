@@ -1496,36 +1496,28 @@ class MainWindow(QMainWindow):
         if not user_name:
             return
             
-        user_channels = []
-        selected_channels = []
-        for ch, container in self.channel_nodes.items():
-            if container.node.is_current_user:
-                user_channels.append(ch)
-                if container.node.is_active:
-                    selected_channels.append(ch)
-                    
+        # Only the selected channels that are booked by this user are released;
+        # MaaS frees exactly the listed channels and leaves the rest booked.
+        selected_channels = sorted(
+            ch for ch, container in self.channel_nodes.items()
+            if container.node.is_current_user and container.node.is_active
+        )
+
         if not selected_channels:
             QMessageBox.warning(self, "No Channels", "Please select at least one of your booked channels to release.")
             return
-            
-        to_keep = [ch for ch in user_channels if ch not in selected_channels]
-        
+
         try:
-            # Release all for user
-            resp = self.session.post(f"{self.api_url}/channels/release/{user_name}", timeout=2)
+            payload = {"channel_numbers": selected_channels}
+            resp = self.session.post(f"{self.api_url}/channels/release/{user_name}", json=payload, timeout=2)
             if resp.status_code == 200:
-                logger.info(f"Released all channels for {user_name}")
-                # Re-book the ones they want to keep
-                if to_keep:
-                    payload = {
-                        "user_name": user_name,
-                        "channel_numbers": to_keep
-                    }
-                    book_resp = self.session.post(f"{self.api_url}/channels/book", json=payload, timeout=2)
-                    if book_resp.status_code != 201:
-                        QMessageBox.warning(self, "Re-booking Failed", f"Released channels, but failed to re-book kept channels: {book_resp.text}")
+                logger.info(f"Released channels {selected_channels} for {user_name}")
             else:
-                QMessageBox.warning(self, "Release Failed", f"Could not release channels: {resp.text}")
+                try:
+                    detail = resp.json().get("detail", resp.text)
+                except Exception:
+                    detail = resp.text
+                QMessageBox.warning(self, "Release Failed", f"Could not release channels: {detail}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to connect to backend: {e}")
             

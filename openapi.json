@@ -878,7 +878,7 @@
           "channels"
         ],
         "summary": "Release Channels",
-        "description": "Release (free up) all channels booked by a measurement or user.\n\nEndpoint: POST /api/v1/channels/release/{user_name}\n\nArgs:\n    user_name: The identifier (user) whose channels to release\n\nReturns:\n    Release confirmation with released channels count\n\nNote:\n    Channels are automatically released when a measurement completes, stops, or fails.\n    This endpoint allows explicit manual release if needed.",
+        "description": "Release (free up) the listed channels booked by a user.\n\nEndpoint: POST /api/v1/channels/release/{user_name}\n\nArgs:\n    user_name: The identifier (user) whose channels to release\n    request: JSON body {\"channel_numbers\": [...]} naming which of the\n        user's channels to release (non-empty)\n\nReturns:\n    Release confirmation with released channels count\n\nRaises:\n    409: If any requested channel is not booked by the user (nothing is released)\n\nNote:\n    Channels stay booked after a measurement completes, stops, or fails; they\n    are only freed by calling this endpoint. Releasing also enqueues a\n    set-parameters job that resets the released channels to their defaults\n    (input_delay=0, trigger_voltage=0.5).",
         "operationId": "release_channels_api_v1_channels_release__user_name__post",
         "parameters": [
           {
@@ -909,6 +909,16 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelReleaseRequest"
               }
             }
           }
@@ -1160,6 +1170,31 @@
         ],
         "title": "ChannelListResponse",
         "description": "Response containing list of channels."
+      },
+      "ChannelReleaseRequest": {
+        "properties": {
+          "channel_numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Channel Numbers",
+            "description": "Channel numbers to release (e.g., [1, 2]). All must be booked by the user; otherwise nothing is released."
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel_numbers"
+        ],
+        "title": "ChannelReleaseRequest",
+        "description": "Body for a channel release: which of the user's channels to free.",
+        "example": {
+          "channel_numbers": [
+            1,
+            2
+          ]
+        }
       },
       "ChannelReleaseResponse": {
         "properties": {
