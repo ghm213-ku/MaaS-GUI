@@ -182,6 +182,20 @@ def test_coincidences_worker_initialization_with_1d_channels(mocker):
     mock_post.assert_not_called()
 
 
+@pytest.mark.parametrize("groups,expected_channels", [
+    ([[1, 1]], [1]),                       # repeated channel within a group
+    ([[1, 2, 1]], [1, 2]),
+    ([[1, 2, 3], [2, 3, 4]], [1, 2, 3, 4]),  # channels shared across groups
+    ([[101, 201]], [101, 201]),            # high Swabian channel IDs
+])
+def test_coincidences_worker_keeps_groups_and_derives_unique_channels(mocker, groups, expected_channels):
+    """Groups are kept as given; the channels to check for booking are the unique, sorted set."""
+    worker = CoincidencesWorker(coincidences=groups, user_name="testuser", coincidence_window=1000)
+
+    assert worker.coincidences == groups
+    assert worker.channels == expected_channels
+
+
 def test_coincidences_worker_run_measurement_start(mocker):
     mocker.patch("requests.Session.post")
     worker = CoincidencesWorker(
@@ -225,21 +239,36 @@ def test_coincidences_worker_run_measurement_start(mocker):
     assert received_arrays[0].shape == (1, 1)
 
 
-def test_coincidences_worker_mock_mode(qtbot):
+def run_until_first_frame(worker, mocker):
+    """Run the worker loop synchronously in this thread and stop after the first frame.
+
+    No QThread is started: run() is called directly, signals are delivered
+    immediately (same thread) and sleeping between frames is skipped.
+    """
+    mocker.patch("time.sleep")
+    data_received = []
+    stream_received = []
+
+    def on_data(d):
+        data_received.append(d)
+        worker.running = False
+
+    worker.newDataReady.connect(on_data)
+    worker.streamDataReady.connect(lambda idx, arr: stream_received.append((idx, arr)))
+    worker.run()
+    return data_received, stream_received
+
+
+def test_coincidences_worker_mock_mode(mocker):
     worker = CoincidencesWorker(
         coincidences=[[1, 2]],
         is_mock=True,
         mode="Repeating",
     )
-    data_received = []
-    worker.newDataReady.connect(lambda d: data_received.append(d))
 
-    worker.start()
-    qtbot.waitUntil(lambda: len(data_received) >= 1, timeout=2000)
-    worker.stop()
-    worker.wait(1000)
+    data_received, _ = run_until_first_frame(worker, mocker)
 
-    assert len(data_received) >= 1
+    assert len(data_received) == 1
     assert data_received[0].shape == (1, 1)
 
 
@@ -345,24 +374,17 @@ def test_coincidences_worker_per_stream_websocket(mocker):
     assert received_streams[0][1][0] == 77.5
 
 
-def test_coincidences_worker_mock_mode_multiple_streams(qtbot):
+def test_coincidences_worker_mock_mode_multiple_streams(mocker):
     worker = CoincidencesWorker(
         coincidences=[[1, 2], [2, 3], [1, 3]],
         is_mock=True,
         mode="Free Running",
     )
-    data_received = []
-    stream_received = []
-    worker.newDataReady.connect(lambda d: data_received.append(d))
-    worker.streamDataReady.connect(lambda idx, arr: stream_received.append((idx, arr)))
 
-    worker.start()
-    qtbot.waitUntil(lambda: len(data_received) >= 1, timeout=2000)
-    worker.stop()
-    worker.wait(1000)
+    data_received, stream_received = run_until_first_frame(worker, mocker)
 
-    assert len(data_received) >= 1
+    assert len(data_received) == 1
     assert data_received[0].shape == (3, 1)
-    assert len(stream_received) >= 3
+    assert [idx for idx, _ in stream_received] == [0, 1, 2]
 
 

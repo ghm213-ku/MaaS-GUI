@@ -15,6 +15,11 @@ def mock_all_network(mocker):
     return mock_get
 
 
+def coinc_kwargs(fake_workers):
+    """Keyword arguments the window passed to the (fake) CoincidencesWorker."""
+    return fake_workers.coincidences.call_args.kwargs
+
+
 # =========================================================================
 # 1. Channels Setup Corner Cases
 # =========================================================================
@@ -58,21 +63,18 @@ def test_validation_invalid_coincidence_window(qtbot, mocker, invalid_window):
     assert window.coinc_worker is None
 
 
-def test_validation_coincidence_window_with_whitespace(qtbot):
+def test_validation_coincidence_window_with_whitespace(qtbot, fake_workers):
     """Coincidence window with leading/trailing whitespace should be parsed cleanly."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2]
 
     window.coinc_boxes[0].setText("1, 2")
     window.coinc_binwidth_input.setText("   2500   ")
     window.start_coincidences_measurement()
 
-    assert window.coinc_worker is not None
-    assert window.coinc_worker.coincidence_window == 2500
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert coinc_kwargs(fake_workers)["coincidence_window"] == 2500
+    window.coinc_worker.start.assert_called_once()
 
 
 # =========================================================================
@@ -143,20 +145,17 @@ def test_validation_non_integer_tokens(qtbot, mocker, non_int_input):
     assert window.coinc_worker is None
 
 
-def test_validation_whitespace_around_numbers(qtbot):
+def test_validation_whitespace_around_numbers(qtbot, fake_workers):
     """Padded spaces around numbers (e.g. ' 1 ,  2 , 3 ') should parse cleanly."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
 
     window.coinc_boxes[0].setText("   1   ,   2   ,   3   ")
     window.start_coincidences_measurement()
 
-    assert window.coinc_worker is not None
-    assert window.coinc_worker.coincidences == [[1, 2, 3]]
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert coinc_kwargs(fake_workers)["coincidences"] == [[1, 2, 3]]
+    window.coinc_worker.start.assert_called_once()
 
 
 # =========================================================================
@@ -178,17 +177,16 @@ def test_validation_single_channel_rejected(qtbot, mocker):
     assert window.coinc_worker is None
 
 
-@pytest.mark.parametrize("repeated_input,expected_group,expected_channels", [
-    ("1, 1", [1, 1], [1]),
-    ("1, 2, 1", [1, 2, 1], [1, 2]),
-    ("2, 3, 2", [2, 3, 2], [2, 3]),
-    ("1, 1, 1", [1, 1, 1], [1]),
+@pytest.mark.parametrize("repeated_input,expected_group", [
+    ("1, 1", [1, 1]),
+    ("1, 2, 1", [1, 2, 1]),
+    ("2, 3, 2", [2, 3, 2]),
+    ("1, 1, 1", [1, 1, 1]),
 ])
-def test_validation_repeated_channels_in_group_allowed(qtbot, mocker, repeated_input, expected_group, expected_channels):
-    """Repeated channels within a group are allowed and passed through unchanged."""
+def test_validation_repeated_channels_in_group_allowed(qtbot, mocker, fake_workers, repeated_input, expected_group):
+    """Repeated channels within a group are allowed and passed to the worker unchanged."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
     mock_warn = mocker.patch("PyQt6.QtWidgets.QMessageBox.warning")
 
@@ -196,18 +194,14 @@ def test_validation_repeated_channels_in_group_allowed(qtbot, mocker, repeated_i
     window.start_coincidences_measurement()
 
     assert not mock_warn.called
-    assert window.coinc_worker is not None
-    assert window.coinc_worker.coincidences == [expected_group]
-    assert window.coinc_worker.channels == expected_channels
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert coinc_kwargs(fake_workers)["coincidences"] == [expected_group]
+    window.coinc_worker.start.assert_called_once()
 
 
-def test_validation_channel_shared_across_groups_allowed(qtbot, mocker):
+def test_validation_channel_shared_across_groups_allowed(qtbot, mocker, fake_workers):
     """The same channel may appear in several groups (e.g. Swabian's [1, 2, 3] and [2, 3, 4])."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3, 4]
     mock_warn = mocker.patch("PyQt6.QtWidgets.QMessageBox.warning")
 
@@ -217,10 +211,8 @@ def test_validation_channel_shared_across_groups_allowed(qtbot, mocker):
     window.start_coincidences_measurement()
 
     assert not mock_warn.called
-    assert window.coinc_worker.coincidences == [[1, 2, 3], [2, 3, 4]]
-    assert window.coinc_worker.channels == [1, 2, 3, 4]
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert coinc_kwargs(fake_workers)["coincidences"] == [[1, 2, 3], [2, 3, 4]]
+    window.coinc_worker.start.assert_called_once()
 
 
 # =========================================================================
@@ -277,21 +269,17 @@ def test_validation_negative_channel_number(qtbot, mocker):
     assert window.coinc_worker is None
 
 
-def test_validation_swabian_channel_ids(qtbot):
+def test_validation_swabian_channel_ids(qtbot, fake_workers):
     """High Swabian channel IDs (e.g. 101, 102, 201) are handled correctly when chosen."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [101, 102, 201]
 
     window.coinc_boxes[0].setText("101, 201")
     window.start_coincidences_measurement()
 
-    assert window.coinc_worker is not None
-    assert window.coinc_worker.coincidences == [[101, 201]]
-    assert window.coinc_worker.channels == [101, 201]
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert coinc_kwargs(fake_workers)["coincidences"] == [[101, 201]]
+    window.coinc_worker.start.assert_called_once()
 
 
 # =========================================================================
@@ -365,11 +353,10 @@ def test_multi_box_second_box_unselected_channel_fails(qtbot, mocker):
     assert window.coinc_worker is None
 
 
-def test_multi_box_overlapping_coincidence_groups_success(qtbot):
+def test_multi_box_overlapping_coincidence_groups_success(qtbot, fake_workers):
     """Multiple coincidence groups with overlapping channels (pairwise coincidences)."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
 
     window.coinc_boxes[0].setText("1, 2")
@@ -380,46 +367,30 @@ def test_multi_box_overlapping_coincidence_groups_success(qtbot):
 
     window.start_coincidences_measurement()
 
-    assert window.coinc_worker is not None
-    assert window.coinc_worker.coincidences == [[1, 2], [2, 3], [1, 3]]
-    assert window.coinc_worker.channels == [1, 2, 3]
-
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert coinc_kwargs(fake_workers)["coincidences"] == [[1, 2], [2, 3], [1, 3]]
+    window.coinc_worker.start.assert_called_once()
 
 
 # =========================================================================
 # 7. Booking Error Handling Corner Case
 # =========================================================================
 
-def test_coincidences_booking_error_stops_measurement(qtbot, mocker):
+def test_coincidences_booking_error_stops_measurement(qtbot, mocker, fake_workers):
     """If CoincidencesWorker reports a booking_error, UI shows critical error and stops."""
-    from hardware.coincidences_worker import CoincidencesWorker
     window = MainWindow()
     qtbot.addWidget(window)
     window.get_selected_channels = lambda: [1, 2]
     window.coinc_boxes[0].setText("1, 2")
-
     mock_crit = mocker.patch("PyQt6.QtWidgets.QMessageBox.critical")
-
-    # Have worker initialize with booking_error without executing background threads
-    def mock_worker_init(self, *args, **kwargs):
-        super(CoincidencesWorker, self).__init__()
-        self.booking_error = "Channels already booked by user_X"
-        self.running = False
-        self.is_mock = True
-        self.ws = None
-
-
-    mocker.patch("hardware.coincidences_worker.CoincidencesWorker.__init__", mock_worker_init)
-    mock_start = mocker.patch("hardware.coincidences_worker.CoincidencesWorker.start")
+    fake_workers.booking_error = "Channels already booked by user_X"
 
     window.start_coincidences_measurement()
 
     assert mock_crit.called
     assert "Cannot Start Measurement" in mock_crit.call_args[0][1]
-    assert not mock_start.called  # never start a measurement on unbooked channels
     assert "Channels already booked by user_X" in mock_crit.call_args[0][2]
+    worker = fake_workers.created[-1]
+    worker.start.assert_not_called()  # never start a measurement on unbooked channels
     assert window.coinc_worker is None
 
 
@@ -431,7 +402,6 @@ def test_coincidences_multi_stream_curves_and_legend(qtbot):
     """When starting with N coincidence groups, N independent curves and buffers are created."""
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
 
     # Setup 2 boxes: [1, 2] and [2, 3]
@@ -447,16 +417,12 @@ def test_coincidences_multi_stream_curves_and_legend(qtbot):
     assert window.coinc_plot_curve == window.coinc_plot_curves[0]
     assert window.coinc_groups == [[1, 2], [2, 3]]
 
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
-
 
 def test_coincidences_multi_stream_plot_update(qtbot):
     """Multiplexed multi-stream updates distribute correctly to individual stream buffers."""
     import numpy as np
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
 
     window.coinc_boxes[0].setText("1, 2")
@@ -484,16 +450,12 @@ def test_coincidences_multi_stream_plot_update(qtbot):
     assert window.coinc_ydata_streams[0][-1] == 1600.0
     assert window.coinc_ydata_streams[1][-1] == 35.0
 
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
-
 
 def test_coincidences_individual_stream_update(qtbot):
     """Direct per-stream update function properly routes to the target stream."""
     import numpy as np
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
 
     window.coinc_boxes[0].setText("1, 2")
@@ -508,16 +470,12 @@ def test_coincidences_individual_stream_update(qtbot):
     assert window.coinc_ydata_streams[0][-1] == 450.0
     assert window.coinc_ydata_streams[1][-1] == 820.0
 
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
-
 
 def test_coincidences_reset_clears_multi_streams(qtbot):
     """Resetting coincidences measurement resets all stream buffers, curves, and worker."""
     import numpy as np
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3]
 
     window.coinc_boxes[0].setText("1, 2")

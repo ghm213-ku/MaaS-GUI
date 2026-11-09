@@ -195,13 +195,10 @@ def test_coincidences_tab_validation_format_and_empty(qtbot, mocker):
 
     # 4. Repeated channels within a group are allowed (no validation warning)
     mock_warn.reset_mock()
-    window.force_mock = True
     window.coinc_boxes[0].setText('1, 1')
     window.start_coincidences_measurement()
     assert not mock_warn.called
-    assert window.coinc_worker is not None
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    window.coinc_worker.start.assert_called_once()
 
 
 def test_coincidences_tab_validation_unselected_channels(qtbot, mocker):
@@ -220,10 +217,9 @@ def test_coincidences_tab_validation_unselected_channels(qtbot, mocker):
     assert window.coinc_worker is None
 
 
-def test_coincidences_tab_validation_success_and_multi_group(qtbot):
+def test_coincidences_tab_validation_success_and_multi_group(qtbot, fake_workers):
     window = MainWindow()
     qtbot.addWidget(window)
-    window.force_mock = True
     window.get_selected_channels = lambda: [1, 2, 3, 4]
 
     # Group 1: 1, 2, 3
@@ -235,19 +231,14 @@ def test_coincidences_tab_validation_success_and_multi_group(qtbot):
     window.coinc_boxes[1].setText('2, 4')
 
     window.start_coincidences_measurement()
-    assert window.coinc_worker is not None
-    assert window.coinc_worker.coincidences == [[1, 2, 3], [2, 4]]
-    assert window.coinc_worker.channels == [1, 2, 3, 4]
-
-    window.coinc_worker.stop()
-    window.coinc_worker.wait(1000)
+    assert fake_workers.coincidences.call_args.kwargs["coincidences"] == [[1, 2, 3], [2, 4]]
+    window.coinc_worker.start.assert_called_once()
 
 
 @pytest.mark.parametrize("suffix", ["", "2"])
-def test_start_histogram_passes_auth_token_and_server(qtbot, mocker, suffix):
+def test_start_histogram_passes_auth_token_and_server(qtbot, fake_workers, suffix):
     """Both histogram tabs must send the login token, otherwise MaaS answers 401."""
-    worker_cls = mocker.patch("ui.main_window.HistogramWorker")
-    worker_cls.return_value.booking_error = None
+    worker_cls = fake_workers.histogram
 
     window = MainWindow()
     qtbot.addWidget(window)
