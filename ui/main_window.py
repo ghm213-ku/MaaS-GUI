@@ -304,12 +304,15 @@ class HistogramCursor:
     """Green vertical line following the mouse, with the nearest bin's time and counts.
 
     ``get_xy`` returns the plotted (x seconds, y counts) arrays, or (None, None).
+    Alternatively ``get_series`` returns (x seconds, [(label, y), ...]) for plots
+    with several curves sharing one x axis; each curve gets its own line in the label.
     Call ``attach()`` again after ``plot_widget.clear()``.
     """
 
-    def __init__(self, plot_widget, get_xy):
+    def __init__(self, plot_widget, get_xy=None, get_series=None):
         self.plot_widget = plot_widget
         self.get_xy = get_xy
+        self.get_series = get_series
         self.v_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('g', width=2))
         self.label = pg.TextItem(anchor=(0, 1), color='w', fill=(0, 0, 0, 200))
         self.attach()
@@ -327,14 +330,25 @@ class HistogramCursor:
         x_val = point.x()
         self.v_line.setPos(x_val)
 
-        x, y = self.get_xy()
-        if x is None or y is None or len(x) == 0 or len(x) != len(y):
+        if self.get_series is not None:
+            x, series = self.get_series()
+        else:
+            x, y = self.get_xy()
+            series = [("Counts", y)]
+        if x is None or len(x) == 0:
             return
-        i = int(np.clip(np.searchsorted(x, x_val), 1, len(x) - 1))
-        if abs(x[i - 1] - x_val) <= abs(x[i] - x_val):
-            i -= 1
+        series = [(name, y) for name, y in (series or []) if y is not None and len(y) == len(x)]
+        if not series:
+            return
+        if len(x) == 1:
+            i = 0
+        else:
+            i = int(np.clip(np.searchsorted(x, x_val), 1, len(x) - 1))
+            if abs(x[i - 1] - x_val) <= abs(x[i] - x_val):
+                i -= 1
         time_text = pg.siFormat(float(x[i]), suffix='s', precision=4)
-        self.label.setHtml(f"<div style='text-align: left'>t: {time_text}<br>Counts: {y[i]:g}</div>")
+        lines = [f"t: {time_text}"] + [f"{name}: {float(y[i]):g}" for name, y in series]
+        self.label.setHtml(f"<div style='text-align: left'>{'<br>'.join(lines)}</div>")
         self.label.setPos(x_val, point.y())
 
 
@@ -1914,6 +1928,8 @@ class MainWindow(QMainWindow):
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = []
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+        self.coinc_cursor = HistogramCursor(
+            self.coinc_plot_widget, get_series=self._weak_series_getter(MainWindow._coinc_series))
 
         # Plot with an overlaid checkbox legend (same as the Counter tab), so
         # individual coincidence groups can be shown / hidden.
@@ -2131,6 +2147,7 @@ class MainWindow(QMainWindow):
         binwidth_ps, n_values = binning
 
         self.coinc_plot_widget.clear()
+        self.coinc_cursor.attach()
         self._clear_coinc_legend()
         self.coinc_plot_widget.enableAutoRange()
 
@@ -2220,6 +2237,7 @@ class MainWindow(QMainWindow):
         self.coinc_xdata = np.array([])
         self.coinc_plot_curves = []
         self.coinc_plot_widget.clear()
+        self.coinc_cursor.attach()
         self._clear_coinc_legend()
         self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
         from PyQt6.QtWidgets import QStyle
@@ -2397,6 +2415,9 @@ class MainWindow(QMainWindow):
         self.hist_filter_plot_widget.setLabel('bottom', 'Time (s)')
         self.hist_filter_plot_widget.setLabel('left', 'Sum in Filter')
         self.hist_filter_curve = self.hist_filter_plot_widget.plot(pen='y')
+        self.hist_filter_cursor = HistogramCursor(
+            self.hist_filter_plot_widget,
+            get_series=self._weak_series_getter(lambda w: MainWindow._hist_filter_series(w, 'hist')))
 
         self.hist_filter_ydata = []
         self.hist_filter_xdata = []
@@ -2534,6 +2555,9 @@ class MainWindow(QMainWindow):
         self.hist2_filter_plot_widget.setLabel('bottom', 'Time (s)')
         self.hist2_filter_plot_widget.setLabel('left', 'Sum in Filter')
         self.hist2_filter_curve = self.hist2_filter_plot_widget.plot(pen='y')
+        self.hist2_filter_cursor = HistogramCursor(
+            self.hist2_filter_plot_widget,
+            get_series=self._weak_series_getter(lambda w: MainWindow._hist_filter_series(w, 'hist2')))
 
         self.hist2_filter_ydata = []
         self.hist2_filter_xdata = []
@@ -3539,6 +3563,40 @@ class MainWindow(QMainWindow):
                 return None, None
             return getattr(window, x_attr, None), getattr(window, y_attr, None)
         return get_xy
+
+    def _weak_series_getter(self, fn):
+        """Wrap ``fn(window) -> (x, [(label, y), ...])`` holding only a weak window reference
+        (same reason as ``_histogram_xy_getter``). ``fn`` must not capture ``self``."""
+        window_ref = weakref.ref(self)
+
+        def get_series():
+            window = window_ref()
+            if window is None:
+                return None, []
+            return fn(window)
+        return get_series
+
+    @staticmethod
+    def _hist_filter_series(window, prefix):
+        x = getattr(window, f'{prefix}_filter_xdata', None)
+        series = [("Filter 1", getattr(window, f'{prefix}_filter_ydata', None))]
+        second_flag = 'second_filter_active' if prefix == 'hist' else f'{prefix}_second_filter_active'
+        if getattr(window, second_flag, False):
+            series.append(("Filter 2", getattr(window, f'{prefix}_filter_ydata_2', None)))
+        return x, series
+
+    @staticmethod
+    def _coinc_series(window):
+        x = getattr(window, 'coinc_xdata', None)
+        curves = getattr(window, 'coinc_plot_curves', [])
+        streams = getattr(window, 'coinc_ydata_streams', [])
+        groups = getattr(window, 'coinc_groups', [])
+        series = []
+        for i, curve in enumerate(curves):
+            if i < len(streams) and curve.isVisible():
+                name = f"Coinc {groups[i]}" if i < len(groups) else f"Coinc {i + 1}"
+                series.append((name, streams[i]))
+        return x, series
 
     def show_stream_problem(self, message):
         """Show a live-stream warning in the status bar without interrupting the user."""
