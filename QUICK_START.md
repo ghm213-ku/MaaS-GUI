@@ -91,5 +91,5 @@ Admins see an extra **User Management** tab with a dropdown of three actions.
 
 ## Further reading
 
-- [MaaS-GUI User Guide](USER_GUIDE.md): the full reference, covering every control, field default, counter mode, filter, saved file format and error message.
+- [MaaS-GUI In-Depth Guide](IN_DEPTH_GUIDE.md): the full reference, covering every control, field default, counter mode, filter, saved file format and error message.
 - [Time Tagger user manual](https://www.swabianinstruments.com/static/documentation/TimeTagger/): Swabian's documentation. The measurement pages matching the GUI tabs are [Counter](https://www.swabianinstruments.com/static/documentation/TimeTagger/api/measurements/event_counting.html#counter), [StartStop, Histogram and Correlation](https://www.swabianinstruments.com/static/documentation/TimeTagger/api/measurements/time_histograms.html), and [Coincidences](https://www.swabianinstruments.com/static/documentation/TimeTagger/api/VirtualChannels.html#coincidences).

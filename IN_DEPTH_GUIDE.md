@@ -1,4 +1,4 @@
-# MaaS-GUI User Guide
+# MaaS-GUI In-Depth Guide
 
 MaaS (Measurement as a Service) runs the lab's Swabian Time Tagger on a shared server. MaaS-GUI is the desktop app for it: you log in, book channels, run Counter, Histogram and Coincidence measurements, and save the data from your own PC. The measurements behave like the Time Tagger API classes of the same name, and all times you type are in picoseconds (`1e9` ps = 1 ms) unless stated otherwise.
 
