@@ -25,6 +25,7 @@ from hardware.worker import CountRateWorker, normalize_server_url, DEFAULT_SERVE
 from hardware.histogram_worker import HistogramWorker
 from hardware.coincidences_worker import CoincidencesWorker
 from hardware.health import HealthCheckTask
+from version import __version__
 
 # How often the home page re-checks MaaS health while logged in.
 MAAS_HEALTH_INTERVAL_MS = 15000
@@ -388,7 +389,7 @@ class MainWindow(QMainWindow):
         self.jwt_payload = {}
         self.add_user_tab = None
         
-        self.setWindowTitle("Swabian Count Rate Monitor")
+        self.setWindowTitle(f"Swabian Count Rate Monitor v{__version__}")
         self.resize(260, 220)
         self.worker = None
         self.old_workers = []

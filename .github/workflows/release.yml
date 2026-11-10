@@ -1,0 +1,50 @@
+# Builds MaaS-GUI.exe and publishes it as a GitHub Release when a version
+# tag (e.g. v1.0.1) is pushed. See RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Check tag matches version.py
+        shell: bash
+        run: |
+          code_version=$(python -c "from version import __version__; print(__version__)")
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$code_version" != "$tag_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version.py ($code_version)"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -r requirements-build.txt
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+
+      - name: Build executable
+        run: python -m PyInstaller --noconfirm --clean maas_gui.spec
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/MaaS-GUI.exe \
+            --title "MaaS GUI $GITHUB_REF_NAME" \
+            --generate-notes

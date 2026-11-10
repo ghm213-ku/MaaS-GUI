@@ -2,7 +2,33 @@
 # Build with:  python -m PyInstaller --noconfirm --clean maas_gui.spec
 # (or just run build.bat). Output: dist/MaaS-GUI.exe
 
+import sys
+
+from PyInstaller.utils.win32.versioninfo import (
+    FixedFileInfo, StringFileInfo, StringStruct, StringTable,
+    VarFileInfo, VarStruct, VSVersionInfo,
+)
+
+sys.path.insert(0, SPECPATH)
+from version import __version__  # noqa: E402
+
 block_cipher = None
+
+# Version shown in the exe's Properties -> Details.
+_ver = tuple(int(p) for p in __version__.split(".")) + (0,)
+version_info = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_ver, prodvers=_ver),
+    kids=[
+        StringFileInfo([StringTable("040904B0", [
+            StringStruct("ProductName", "MaaS GUI"),
+            StringStruct("FileDescription", "MaaS GUI"),
+            StringStruct("FileVersion", __version__),
+            StringStruct("ProductVersion", __version__),
+            StringStruct("OriginalFilename", "MaaS-GUI.exe"),
+        ])]),
+        VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+    ],
+)
 
 a = Analysis(
     ["main.py"],
@@ -36,4 +62,5 @@ exe = EXE(
     upx=False,
     runtime_tmpdir=None,
     console=False,  # GUI app: no console window
+    version=version_info,
 )
