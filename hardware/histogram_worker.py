@@ -4,8 +4,7 @@ import requests
 import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
-import atexit
-from hardware.worker import normalize_server_url, check_channels_booked, ws_auth_header, DEFAULT_SERVER_IP
+from hardware.worker import BackendTeardownMixin, normalize_server_url, check_channels_booked, ws_auth_header, DEFAULT_SERVER_IP
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ def histogram_refresh_rate(n_bins):
     return int(min(MAX_REFRESH_RATE_HZ, max(MIN_REFRESH_RATE_HZ, rate)))
 
 
-class HistogramWorker(QThread):
+class HistogramWorker(BackendTeardownMixin, QThread):
     """
     Background thread dedicated to interacting with the MaaS API via Redis Pub/Sub.
     """
@@ -62,7 +61,7 @@ class HistogramWorker(QThread):
         self.booking_error = None
         self.is_mock = is_mock
         
-        atexit.register(self.force_teardown)
+        self._init_teardown()
         
         # Channels must already be booked by this user via the home page;
         # the worker never books channels itself.
@@ -129,6 +128,8 @@ class HistogramWorker(QThread):
             if not self.measurement_id:
                 logger.error("No measurement_id returned by the API!")
                 return
+            if self._stopped_while_starting():
+                return
 
             # 2. Connect to WebSocket stream
             ws_url = f"{self.ws_base_url}/measurements/stream/{self.measurement_id}"
@@ -191,7 +192,7 @@ class HistogramWorker(QThread):
         except Exception as e:
             logger.exception(f"Hardware/Network Error: {e}")
         finally:
-            self._perform_teardown()
+            self._finish_run()
 
     def _run_mock(self):
         import time
@@ -216,43 +217,6 @@ class HistogramWorker(QThread):
                 
             time.sleep(refresh_interval)
 
-    def _perform_teardown(self):
-        if getattr(self, '_teardown_done', False):
-            return
-        self._teardown_done = True
-        
-        try:
-            atexit.unregister(self.force_teardown)
-        except Exception:
-            pass
-        
-        if getattr(self, 'is_mock', False):
-            return
-
-        # Close WebSocket
-        if self.ws:
-            try:
-                self.ws.close()
-            except:
-                pass
-
-        # Stop measurement
-        if self.measurement_id:
-            for attempt in range(2):
-                try:
-                    # Swabian hardware takes ~5.5s to teardown on the backend!
-                    self.session.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
-                    logger.info(f"Successfully stopped measurement {self.measurement_id}")
-                    break
-                except Exception as e:
-                    logger.error(f"Failed to stop measurement (attempt {attempt+1}): {e}")
-
-        # Channels stay booked: they are only released via the Release button on the home page.
-            
-    def force_teardown(self):
-        """Called by the GUI on exit to ensure teardown runs synchronously before process death."""
-        self.running = False
-        self._perform_teardown()
         
     def stop(self):
         self.running = False
