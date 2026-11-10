@@ -53,7 +53,11 @@ There are three measurement tabs. They behave like the Time Tagger measurements 
 
 While a measurement runs you cannot switch tabs. Stop or pause it first.
 
-**Counter.** Count rate per booked channel over time. Set *Bin width* and *N values*, then choose a mode: *Free running* (endless), *Single* (N values, then stop) or *Repeating* (N values, clear, repeat).
+**Counter.** Counts per bin on each blue channel. Set *Bin width* (default 1 ms) and *Bins* (default 1000), then choose a mode:
+
+- *Free Running*: runs until stopped. Once the buffer of *Bins* bins has filled, each bin keeps adding up counts frame by frame.
+- *Single*: records exactly Bins × Bin width (for example 1000 × 1 ms = 1 s), then stops by itself.
+- *Repeating*: sets Bin width to 1 s and locks Bins to 1. Each bin's total becomes a new point on a scrolling chart.
 
 **Histograms.** Pick a mode (*Start-Stop*, *Histogram* or *Correlation*), a start channel and a click channel, a bin width and a number of bins. Press Enter in a field to restart with the new value. The bold **+** at the top right opens a second, independent Histograms tab.
 
