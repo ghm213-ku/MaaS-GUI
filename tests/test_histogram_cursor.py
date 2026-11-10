@@ -1,4 +1,4 @@
-"""Histogram tabs show a green cursor line with the nearest bin's time and counts."""
+"""Histogram tabs show a dashed gray cursor line with the nearest bin's time and counts."""
 import numpy as np
 import pyqtgraph as pg
 import pytest

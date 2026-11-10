@@ -276,6 +276,17 @@ class ChannelNodeContainer(QWidget):
 
 from PyQt6.QtWidgets import QStyle
 
+# Neutral hover-cursor line, so it never matches a plotted curve's colour.
+def _cursor_pen():
+    return pg.mkPen(color=(220, 220, 220, 200), width=1.5, style=Qt.PenStyle.DashLine)
+
+
+# Coincidence-group curve colours. No pure green, so curves stay distinct
+# from each other and from the cursor line.
+COINC_PALETTE = ['#4fc3f7', '#ffb000', '#ff4d9d', '#b388ff',
+                 '#ffee58', '#ff7043', '#26c6da', '#f48fb1']
+
+
 class SITimeAxisItem(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
         strings = []
@@ -301,7 +312,7 @@ class SITimeAxisItem(pg.AxisItem):
 
 
 class HistogramCursor:
-    """Green vertical line following the mouse, with the nearest bin's time and counts.
+    """Dashed gray vertical line following the mouse, with the nearest bin's time and counts.
 
     ``get_xy`` returns the plotted (x seconds, y counts) arrays, or (None, None).
     Alternatively ``get_series`` returns (x seconds, [(label, y), ...]) for plots
@@ -313,7 +324,7 @@ class HistogramCursor:
         self.plot_widget = plot_widget
         self.get_xy = get_xy
         self.get_series = get_series
-        self.v_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('g', width=2))
+        self.v_line = pg.InfiniteLine(angle=90, movable=False, pen=_cursor_pen())
         self.label = pg.TextItem(anchor=(0, 1), color='w', fill=(0, 0, 0, 200))
         self.attach()
         plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
@@ -1792,7 +1803,7 @@ class MainWindow(QMainWindow):
         self.plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
         
         # Hover Tooltip & Vertical Line
-        self.v_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('g', width=2))
+        self.v_line = pg.InfiniteLine(angle=90, movable=False, pen=_cursor_pen())
         self.plot_widget.addItem(self.v_line, ignoreBounds=True)
         
         self.tooltip_label = pg.TextItem(anchor=(0, 1), color='w', fill=(0, 0, 0, 200))
@@ -1920,14 +1931,14 @@ class MainWindow(QMainWindow):
         
         self.coinc_plot_widget = pg.PlotWidget(axisItems={'bottom': SITimeAxisItem(orientation='bottom')})
         self.coinc_plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.coinc_plot_widget.setLabel('bottom', 'Time (s, 0 = latest bin)')
+        self.coinc_plot_widget.setLabel('bottom', 'Time before now (s)')
         self.coinc_plot_widget.setLabel('left', 'Coincidences / bin')
         self.coinc_binwidth_ps = int(float(self.COINC_DEFAULT_BINWIDTH))
         self.coinc_xdata = np.array([])
         self.coinc_plot_widget.getViewBox().setMouseMode(pg.ViewBox.PanMode)
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = []
-        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen=pg.mkPen(COINC_PALETTE[0], width=2))
         self.coinc_cursor = HistogramCursor(
             self.coinc_plot_widget, get_series=self._weak_series_getter(MainWindow._coinc_series))
 
@@ -2151,7 +2162,7 @@ class MainWindow(QMainWindow):
         self._clear_coinc_legend()
         self.coinc_plot_widget.enableAutoRange()
 
-        palette = ['#00ff00', '#00e5ff', '#ffaa00', '#ff00aa', '#ffff00', '#aa00ff', '#ff5500', '#00aaff']
+        palette = COINC_PALETTE
         self.coinc_plot_curves = []
         self.coinc_ydata_streams = [[] for _ in coincidences]
         self.coinc_groups = coincidences
@@ -2239,7 +2250,7 @@ class MainWindow(QMainWindow):
         self.coinc_plot_widget.clear()
         self.coinc_cursor.attach()
         self._clear_coinc_legend()
-        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen='g')
+        self.coinc_plot_curve = self.coinc_plot_widget.plot(pen=pg.mkPen(COINC_PALETTE[0], width=2))
         from PyQt6.QtWidgets import QStyle
         self.coinc_btn_play_pause.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.coinc_btn_play_pause.setToolTip("Start")
