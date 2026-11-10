@@ -29,6 +29,9 @@ from version import __version__
 
 # How often the home page re-checks MaaS health while logged in.
 MAAS_HEALTH_INTERVAL_MS = 15000
+# How long closing the window waits for workers to stop their MaaS measurements:
+# a start request (~2 s hardware init) plus a stop (~5.5 s), with margin.
+CLOSE_WAIT_S = 20
 
 MAAS_STATE_STYLES = {
     # state: (label, dot colour, text colour)
@@ -4121,17 +4124,28 @@ class MainWindow(QMainWindow):
             if w is not None and w not in workers:
                 workers.append(w)
 
+        # Ask every worker to stop; each one stops its MaaS measurement from its
+        # own thread, so the (slow, ~5.5 s) DELETEs run in parallel. A worker
+        # still waiting for its start request (~2 s) stops the measurement as
+        # soon as the ID arrives, so wait long enough for start + stop.
+        for w in workers:
+            try:
+                w.stop()
+            except Exception:
+                logger.exception("Error stopping worker %r on close", w)
+        deadline = time.monotonic() + CLOSE_WAIT_S
+        for w in workers:
+            try:
+                remaining_ms = max(0, int((deadline - time.monotonic()) * 1000))
+                if w.isRunning() and not w.wait(remaining_ms):
+                    logger.warning("Worker %r still running at shutdown", w)
+            except Exception:
+                logger.exception("Error waiting for worker %r on close", w)
+        # Workers that never ran, or are stuck: stop any measurement they know of.
         for w in workers:
             try:
                 w.force_teardown()
             except Exception:
                 logger.exception("Error tearing down worker %r on close", w)
-        # Let every thread exit before the QThread objects are destroyed.
-        for w in workers:
-            try:
-                if w.isRunning() and not w.wait(5000):
-                    logger.warning("Worker %r still running at shutdown", w)
-            except Exception:
-                logger.exception("Error waiting for worker %r on close", w)
 
         event.accept()

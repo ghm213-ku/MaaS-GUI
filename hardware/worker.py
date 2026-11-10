@@ -5,6 +5,7 @@ import websocket
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 import atexit
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,76 @@ def single_duration_seconds(binwidth, n_values):
 SINGLE_FINAL_FRAME_GRACE_S = 10.0
 
 
-class CountRateWorker(QThread):
+class BackendTeardownMixin:
+    """Stops a worker's MaaS measurement exactly once, whoever asks first.
+
+    Teardown can be requested from two threads: the worker's own thread when
+    run() ends, and the GUI thread (closeEvent / atexit) via force_teardown().
+    The measurement ID only arrives once the start request returns (~2 s of
+    hardware init), so a teardown requested before then has nothing to stop
+    yet. It must not mark the worker as torn down: the worker stops the
+    measurement itself as soon as the ID arrives (see _stopped_while_starting).
+    """
+
+    def _init_teardown(self):
+        self._teardown_lock = threading.Lock()
+        self._stopped_measurement_id = None
+        atexit.register(self.force_teardown)
+
+    def _perform_teardown(self):
+        # Held during the DELETE so a concurrent caller (e.g. closeEvent) waits
+        # for the stop to finish instead of returning early.
+        with self._teardown_lock:
+            if self.ws:
+                try:
+                    self.ws.close()
+                except Exception:
+                    pass
+
+            if getattr(self, 'is_mock', False):
+                return
+
+            measurement_id = self.measurement_id
+            if not measurement_id or measurement_id == self._stopped_measurement_id:
+                return
+            self._stopped_measurement_id = measurement_id
+
+            for attempt in range(2):
+                try:
+                    # Swabian hardware takes ~5.5s to teardown on the backend!
+                    self.session.delete(f"{self.base_url}/measurements/{measurement_id}", timeout=10)
+                    logger.info(f"Successfully stopped measurement {measurement_id}")
+                    break
+                except Exception as e:
+                    logger.error(f"Failed to stop measurement (attempt {attempt+1}): {e}")
+            # Channels stay booked: they are only released via the Release button on the home page.
+
+    def _finish_run(self):
+        """Run from the worker thread when run() ends, however it ends."""
+        self._perform_teardown()
+        try:
+            atexit.unregister(self.force_teardown)
+        except Exception:
+            pass
+
+    def _stopped_while_starting(self):
+        """True if the worker was stopped while the start request was in flight.
+
+        The measurement now exists on MaaS, so run() must return (its finally
+        block stops it) rather than connect a stream nobody will read.
+        """
+        if self.running:
+            return False
+        logger.info(f"Worker stopped while measurement {self.measurement_id} was starting; stopping it.")
+        return True
+
+    def force_teardown(self):
+        """Called by the GUI on exit to ensure teardown runs synchronously before process death."""
+        self.running = False
+        self._perform_teardown()
+
+
+class CountRateWorker(BackendTeardownMixin, QThread):
     """
     Background thread dedicated to interacting with the MaaS API via Redis Pub/Sub.
     """
@@ -115,7 +185,7 @@ class CountRateWorker(QThread):
         self.booking_error = None
         self.is_mock = is_mock
         
-        atexit.register(self.force_teardown)
+        self._init_teardown()
 
         # Channels must already be booked by this user via the home page;
         # the worker never books channels itself.
@@ -171,6 +241,8 @@ class CountRateWorker(QThread):
 
             if not self.measurement_id:
                 logger.error("No measurement_id returned by the API!")
+                return
+            if self._stopped_while_starting():
                 return
 
             # 2. Connect to WebSocket stream
@@ -241,7 +313,7 @@ class CountRateWorker(QThread):
         except Exception as e:
             logger.exception(f"Hardware/Network Error: {e}")
         finally:
-            self._perform_teardown()
+            self._finish_run()
 
     def _run_mock(self):
         import time
@@ -278,43 +350,6 @@ class CountRateWorker(QThread):
                     
             time.sleep(refresh_interval)
 
-    def _perform_teardown(self):
-        if getattr(self, '_teardown_done', False):
-            return
-        self._teardown_done = True
-        
-        try:
-            atexit.unregister(self.force_teardown)
-        except Exception:
-            pass
-        
-        if getattr(self, 'is_mock', False):
-            return
-
-        # Close WebSocket
-        if self.ws:
-            try:
-                self.ws.close()
-            except:
-                pass
-
-        # Stop measurement
-        if self.measurement_id:
-            for attempt in range(2):
-                try:
-                    # Swabian hardware takes ~5.5s to teardown on the backend!
-                    self.session.delete(f"{self.base_url}/measurements/{self.measurement_id}", timeout=10)
-                    logger.info(f"Successfully stopped measurement {self.measurement_id}")
-                    break
-                except Exception as e:
-                    logger.error(f"Failed to stop measurement (attempt {attempt+1}): {e}")
-
-        # Channels stay booked: they are only released via the Release button on the home page.
-            
-    def force_teardown(self):
-        """Called by the GUI on exit to ensure teardown runs synchronously before process death."""
-        self.running = False
-        self._perform_teardown()
         
     def stop(self):
         self.running = False
