@@ -5,17 +5,33 @@ from pathlib import Path
 
 import PyQt6
 
+# True when running from the packaged executable built by PyInstaller.
+FROZEN = getattr(sys, "frozen", False)
+
 # Anaconda can expose Qt 5 plugins ahead of PyQt6's bundled Qt 6 plugins.
-os.environ.setdefault(
-    "QT_PLUGIN_PATH",
-    str(Path(PyQt6.__file__).resolve().parent / "Qt6" / "plugins"),
-)
+# The packaged build ships its own plugins and configures them itself.
+if not FROZEN:
+    os.environ.setdefault(
+        "QT_PLUGIN_PATH",
+        str(Path(PyQt6.__file__).resolve().parent / "Qt6" / "plugins"),
+    )
 
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QPen, QPalette
 from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
 
-LOG_FILE = "maas_gui.log"
+
+def _default_log_file():
+    """Log next to the source when run as a script; in a writable per-user
+    folder (%LOCALAPPDATA%\\MaaS-GUI) when run as the packaged executable."""
+    if not FROZEN:
+        return "maas_gui.log"
+    base = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "MaaS-GUI"
+    base.mkdir(parents=True, exist_ok=True)
+    return str(base / "maas_gui.log")
+
+
+LOG_FILE = _default_log_file()
 
 
 def install_crash_logging(log_file=LOG_FILE):
@@ -83,13 +99,14 @@ _fault_file = None
 
 if __name__ == '__main__':
     # Setup robust logging for the entire application
+    handlers = [logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')]
+    # A windowed executable has no console (sys.stdout is None).
+    if sys.stdout is not None:
+        handlers.append(logging.StreamHandler(sys.stdout))
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8'),
-            logging.StreamHandler(sys.stdout)
-        ]
+        handlers=handlers,
     )
     logger = logging.getLogger(__name__)
     install_crash_logging()
