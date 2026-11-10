@@ -63,7 +63,8 @@ def test_main_window_initialization(qtbot, mocker):
     window = MainWindow()
     qtbot.addWidget(window)
     
-    assert window.windowTitle() == "Swabian Count Rate Monitor"
+    from version import __version__
+    assert window.windowTitle() == f"Swabian Count Rate Monitor v{__version__}"
     assert window.tabs.count() == 5
     assert len(window.channel_nodes) == 18
 
