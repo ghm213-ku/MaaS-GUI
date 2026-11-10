@@ -4,6 +4,11 @@ Welcome to the Measurement as a Service (MaaS) Graphical User Interface! This ap
 
 ## Getting Started
 
+### 0. Running the Application
+- **Standalone (no Python needed)**: Double-click `MaaS-GUI.exe`. The first launch takes a few seconds while it unpacks. To run with generated test data, start it as `MaaS-GUI.exe -testing` (e.g. from a shortcut's *Target* field). Logs are written to `%LOCALAPPDATA%\MaaS-GUI\maas_gui.log`.
+- **From source**: `python main.py` (add `-testing` for test data).
+- **Building the executable** (developers, Windows): run `build.bat`. It installs the dependencies plus PyInstaller and produces `dist\MaaS-GUI.exe`, which is the only file you need to share.
+
 ### 1. Account & Connection
 When you launch the application, you'll start on the **Account** tab.
 - Enter your **Username** and **Password**.
